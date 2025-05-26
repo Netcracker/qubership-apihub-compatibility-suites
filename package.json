@@ -22,7 +22,6 @@
     "postinstall": "node bin/generate-suite-service.js",
     "build": "vite build",
     "development:link": "npm link",
-    "development:unlink": "npm unlink",
     "feature-start": "feature-start --featureName",
     "feature-finish": "feature-finish",
     "release-start": "release-start",
