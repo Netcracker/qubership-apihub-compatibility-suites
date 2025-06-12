@@ -13,8 +13,8 @@ paths:
             properties:
               id:
                 type: integer
-                xml:
-                  attribute: false
+            xml:
+              attribute: false
       responses:
         '200':
           description: OK

@@ -15,5 +15,5 @@ paths:
                 properties:
                   id:
                     type: integer
-                    xml:
-                      attribute: false
+                xml:
+                  attribute: false

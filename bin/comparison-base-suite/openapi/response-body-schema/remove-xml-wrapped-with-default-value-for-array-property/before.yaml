@@ -14,5 +14,5 @@ paths:
                 type: array
                 items:
                   type: string
-                  xml:
-                    wrapped: false
+                xml:
+                  wrapped: false
