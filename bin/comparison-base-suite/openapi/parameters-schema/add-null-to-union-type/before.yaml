@@ -3,8 +3,8 @@ info:
   title: Add type to union
   version: 1.0.0
 paths:
-  /example:
-    get:
+  /path1:
+    post:
       parameters:
         - name: data
           in: query

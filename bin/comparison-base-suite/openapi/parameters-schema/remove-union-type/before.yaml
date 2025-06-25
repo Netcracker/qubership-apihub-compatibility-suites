@@ -3,8 +3,8 @@ info:
   title: Union to single type
   version: 1.0.0
 paths:
-  /example:
-    get:
+  /path1:
+    post:
       parameters:
         - name: input
           in: query

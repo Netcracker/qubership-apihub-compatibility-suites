@@ -3,7 +3,7 @@ info:
   title: Remove Type from Union
   version: 1.0.0
 paths:
-  /example:
+  /path1:
     post:
       requestBody:
         content:

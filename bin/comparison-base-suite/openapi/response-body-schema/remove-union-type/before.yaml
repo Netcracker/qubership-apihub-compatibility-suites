@@ -3,7 +3,7 @@ info:
   title: Union to single type
   version: 1.0.0
 paths:
-  /example:
+  /path1:
     post:
       responses:
         '200':

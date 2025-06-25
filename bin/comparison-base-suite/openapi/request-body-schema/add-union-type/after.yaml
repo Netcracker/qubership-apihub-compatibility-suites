@@ -3,7 +3,7 @@ info:
   title: Change to union type
   version: 1.0.0
 paths:
-  /example:
+  /path1:
     post:
       requestBody:
         content:
