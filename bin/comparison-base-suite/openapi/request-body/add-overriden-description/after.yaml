@@ -3,7 +3,7 @@ info:
   title: Swagger Petstore - OpenAPI 3.1
   version: 1.0.12
 paths:
-  /store/order:
+  /path1:
     post:
       summary: Place an order for a pet. (requestBodies)
       description: Place a new order in the store.

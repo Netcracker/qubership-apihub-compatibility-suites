@@ -3,7 +3,7 @@ info:
   title: Swagger Petstore - OpenAPI 3.1
   version: 1.0.12
 paths:
-  /pet:
+  /path1:
     post:
       summary: Create pet
       description: Pet creation

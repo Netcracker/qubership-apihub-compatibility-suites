@@ -3,7 +3,7 @@ info:
   title: Swagger Petstore - OpenAPI 3.1
   version: 1.0.12
 paths:
-  /user/login:
+  /path1:
     get:
       summary: Logs user into the system.
       description: Log into the system.
