@@ -4,7 +4,7 @@ info:
   version: 1.0.12
 paths:
   /path1:
-    get:
+    post:
       summary: Finds Pets by tags.
       description: Multiple tags can be provided with comma separated strings. Use tag1, tag2, tag3 for testing.
       operationId: findPetsByTags
