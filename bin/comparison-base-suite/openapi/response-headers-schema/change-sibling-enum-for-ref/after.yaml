@@ -18,7 +18,7 @@ paths:
                 enum:
                   - black
                   - white
-                  - gray              
+                  - gray
 components:
   schemas:
     Color:

@@ -15,7 +15,7 @@ paths:
             X-Header-1:
               schema:
                 $ref: '#/components/schemas/Pet'
-                description: schema description override      
+                description: schema description override
 components:
   schemas:
     Pet:

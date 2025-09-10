@@ -15,7 +15,6 @@ paths:
             X-Header-1:
               schema:
                 $ref: '#/components/schemas/Pet'
-            
 components:
   schemas:
     Pet:
