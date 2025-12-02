@@ -1,0 +1,20 @@
+openapi: 3.0.4
+info:
+  title: test
+  version: 1.0.0
+paths:
+  /pet:
+    post:
+      summary: Add a new pet to the store.
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - name
+                properties:
+                  name:
+                    type: string

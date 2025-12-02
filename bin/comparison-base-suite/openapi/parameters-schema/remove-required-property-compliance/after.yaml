@@ -1,0 +1,19 @@
+openapi: 3.0.4
+info:
+  title: test
+  version: 1.0.0
+paths:
+  /pet:
+    post:
+      summary: Add a new pet to the store.
+      parameters:
+        - name: settings
+          in: query
+          schema:
+            type: object
+            properties:
+              prop1:
+                type: string
+      responses:
+        "200":
+          description: Successful operation
