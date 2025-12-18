@@ -6,4 +6,3 @@ interface Fruit {
   name: String
   type: String
 }
-

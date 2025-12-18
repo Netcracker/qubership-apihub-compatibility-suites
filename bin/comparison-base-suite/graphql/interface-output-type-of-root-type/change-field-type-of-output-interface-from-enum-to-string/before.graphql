@@ -11,4 +11,3 @@ enum FruitType {
   mango
   orange
 }
-

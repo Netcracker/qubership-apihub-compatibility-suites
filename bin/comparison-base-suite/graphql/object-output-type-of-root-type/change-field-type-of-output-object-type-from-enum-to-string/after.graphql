@@ -6,4 +6,3 @@ type Fruit {
   name: String
   type: String
 }
-
