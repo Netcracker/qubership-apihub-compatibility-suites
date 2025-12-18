@@ -2,12 +2,9 @@ type Query {
   fruits: Fruit
 }
 interface Fruit {
-  id: ID
-  name: String
-  type: FruitType
+  name: FruitType
 }
 enum FruitType {
   apple
   mango
-  orange
 }
