@@ -26,11 +26,13 @@
     "update-lock-file": "update-lock-file @netcracker"
   },
   "devDependencies": {
-    "tslib": "2.6.3",
     "@netcracker/qubership-apihub-npm-gitflow": "3.1.0",
+    "@types/js-yaml": "4.0.9",
     "@types/node": "^18.0.0",
+    "js-yaml": "4.1.1",
+    "tslib": "2.6.3",
+    "typescript": "5.3.3",
     "vite": "4.5.0",
-    "vite-plugin-dts": "3.6.4",
-    "typescript": "5.3.3"
+    "vite-plugin-dts": "3.6.4"
   }
 }
