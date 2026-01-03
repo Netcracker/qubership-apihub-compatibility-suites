@@ -5,11 +5,10 @@ info:
 paths:
   /path1:
     post:
-      parameters:
-        - name: field1
-          in: query
-          schema:
-            type: [string, "null"]
       responses:
         '200':
           description: OK
+          headers:
+            X-Header-1:
+              schema:
+                type: [string, "null"]

@@ -5,13 +5,14 @@ info:
 paths:
   /path1:
     post:
-      parameters:
-        - name: field1
-          in: query
-          schema:
-            anyOf:
-              - type: string
-              - type: integer
+      requestBody:
+        content:
+          'application/json':
+            schema:
+              anyOf:
+                - type: string
+                - type: integer
       responses:
         '200':
           description: OK
+          content: {}
