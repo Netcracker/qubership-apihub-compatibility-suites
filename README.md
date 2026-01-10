@@ -23,22 +23,23 @@ OpenAPI cases may additionally contain `metadata.yaml` with a version matrix:
 When used as a dependency, it exposes a JavaScript map of cases (prebuilt in `dist/`), which can be accessed using the public API methods below.
 
 ```ts
-export type OpenApiVersion = string
-export type OpenApiVersionPair = [OpenApiVersion, OpenApiVersion]
+export type SpecificationVersion = string
+export type SpecificationVersionPair = [SpecificationVersion, SpecificationVersion]
 
 export function getCompatibilitySuite(
   suiteType: TestSpecType,
   suiteId: string,
   testId: string,
-  openApiVersionPair?: OpenApiVersionPair,
+  specificationVersionPair?: SpecificationVersionPair,
 ): [string, string]
 
 export function getCompatibilitySuites(specType?: TestSpecType): Map<string, string[]>
 
-export function getOpenApiCompatibilitySuiteVersionPairs(
+export function getCompatibilitySuiteSpecificationVersionPairs(
+  suiteType: TestSpecType,
   suiteId: string,
   testId: string,
-): OpenApiVersionPair[]
+): SpecificationVersionPair[]
 ```
 
 `getCompatibilitySuite` accepts specification type (`openapi`, `graphql`), suite name and case name.
@@ -46,16 +47,18 @@ It returns a pair of strings: `[before, after]`.
 
 `getCompatibilitySuites` enumerates suite cases and returns a map: `suiteId -> testIds[]` (optionally filtered by `specType`).
 
-`getOpenApiCompatibilitySuiteVersionPairs` returns supported OpenAPI version pairs for a given OpenAPI case:
+`getCompatibilitySuiteSpecificationVersionPairs` returns supported specification version pairs for a given case:
 
-- **with** `metadata.yaml`: returns declared `version_combinations` (order preserved)
-- **without** `metadata.yaml`: returns a single default pair (used for enumeration/grouping)
+- OpenAPI:
+  - **with** `metadata.yaml`: returns declared `version_combinations` (order preserved)
+  - **without** `metadata.yaml`: returns a single default pair (used for enumeration/grouping)
+- non-OpenAPI suite types: returns a single default pair (stub; no version matrix yet)
 
-### Behavior: `openApiVersionPair` and metadata
+### Behavior: `specificationVersionPair` and metadata
 
-- If `openApiVersionPair` is **not provided**: returns stored samples as-is.
-- If `openApiVersionPair` is provided:
-  - **non-OpenAPI** suite types: throws (OpenAPI version matrix does not apply).
+- If `specificationVersionPair` is **not provided**: returns stored samples as-is.
+- If `specificationVersionPair` is provided:
+  - suite types without a version-pair patch strategy: throws (currently OpenAPI-only).
   - OpenAPI case **without** `metadata.yaml`: returns stored samples as-is (canonical; no patching).
   - OpenAPI case **with** `metadata.yaml`: validates the pair and patches the root `openapi:` in both samples.
 

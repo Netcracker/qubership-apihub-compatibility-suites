@@ -1,68 +1,73 @@
-/**
- * Copyright 2024-2025 NetCracker Technology Corporation
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { load as loadYaml } from 'js-yaml'
 import path from 'path'
 import { exit } from 'process'
+import { fileURLToPath } from 'url'
 
-// If installed as a dependency, this script is executed from within `node_modules/<package>/...`.
-// In that scenario we intentionally do nothing (the published package must be prebuilt).
-const twoLevelsUp = path.resolve('..', '..')
-if (path.basename(twoLevelsUp) === 'node_modules') {
+// Prevent running generators from an installed package in node_modules.
+// We only generate when executing from the repo workspace at: <PACKAGE_ROOT>/bin/*
+const scriptFilePath = fileURLToPath(import.meta.url)
+const scriptDir = path.dirname(scriptFilePath) // <PACKAGE_ROOT>/bin
+const PACKAGE_ROOT = path.resolve(scriptDir, '..') // <PACKAGE_ROOT>
+if (PACKAGE_ROOT.split(path.sep).includes('node_modules')) {
   exit()
 }
 
-const COMPATIBILITY_SUITES_PATH = `./bin/comparison-base-suite`
+const COMPATIBILITY_SUITES_DIR = path.join(PACKAGE_ROOT, 'bin', 'comparison-base-suite')
 
 const TEST_SPEC_TYPE_OPEN_API = 'openapi'
 const TEST_SPEC_TYPE_GRAPH_QL = 'graphql'
 
-// OpenAPI-only: we currently support only OAS 3.0.x and 3.1.x in the version matrix.
+const DEFAULT_SPEC_SAMPLE_FILE_EXT = 'yaml'
+const GRAPHQL_SAMPLE_FILE_EXT = 'graphql'
+const SPEC_SAMPLE_FILE_EXT_BY_SUITE_TYPE = {
+  [TEST_SPEC_TYPE_GRAPH_QL]: GRAPHQL_SAMPLE_FILE_EXT,
+}
+const getSampleFileExt = (suiteType) =>
+  SPEC_SAMPLE_FILE_EXT_BY_SUITE_TYPE[suiteType] ?? DEFAULT_SPEC_SAMPLE_FILE_EXT
+
+const METADATA_FILE_NAME = 'metadata.yaml'
+
+const GENERATED_SUITE_SERVICE_PATH = path.join(PACKAGE_ROOT, 'generation', 'suite-service.ts')
+
 const VALID_OPENAPI_MAJOR_MINORS = ['3.0', '3.1']
 
-const validateVersionPairs = (versionPairs, suiteKey) => {
+// Logical case key (NOT a filesystem path). We use '/' for readability/stability.
+const CASE_KEY_SEPARATOR = '/'
+const buildCaseKey = (suiteType, suiteId, testId) =>
+  [suiteType, suiteId, testId].join(CASE_KEY_SEPARATOR)
+
+const validateSpecificationVersionPairs = (suiteType, versionPairs, caseKey) => {
   if (!Array.isArray(versionPairs) || versionPairs.length === 0) {
-    throw new Error(`Invalid metadata for case '${suiteKey}': version_combinations must be a non-empty array`)
+    throw new Error(`Invalid metadata for case '${caseKey}': version_combinations must be a non-empty array`)
   }
   for (const pair of versionPairs) {
     if (!Array.isArray(pair) || pair.length !== 2) {
-      throw new Error(`Invalid metadata for case '${suiteKey}': each version pair must be a 2-item array`)
+      throw new Error(`Invalid metadata for case '${caseKey}': each version pair must be a 2-item array`)
     }
     for (const version of pair) {
       if (typeof version !== 'string') {
-        throw new Error(`Invalid metadata for case '${suiteKey}': version must be a string`)
+        throw new Error(`Invalid metadata for case '${caseKey}': version must be a string`)
       }
-      // Strictly accept only 3.0.x and 3.1.x.
-      const majorMinor = version.startsWith('3.0.') ? '3.0' : version.startsWith('3.1.') ? '3.1' : null
-      if (!VALID_OPENAPI_MAJOR_MINORS.includes(majorMinor)) {
-        throw new Error(`Invalid metadata for case '${suiteKey}': unsupported OpenAPI version '${version}'`)
+      // OpenAPI-only: strictly accept only 3.0.x and 3.1.x.
+      if (suiteType === TEST_SPEC_TYPE_OPEN_API) {
+        const majorMinor = version.startsWith('3.0.') ? '3.0' : version.startsWith('3.1.') ? '3.1' : null
+        if (!VALID_OPENAPI_MAJOR_MINORS.includes(majorMinor)) {
+          throw new Error(`Invalid metadata for case '${caseKey}': unsupported OpenAPI version '${version}'`)
+        }
       }
     }
   }
 }
 
-const parseMetadata = (metadataPath, suiteKey) => {
+const parseMetadata = (metadataPath, caseKey, suiteType) => {
   if (!existsSync(metadataPath)) {
     return null
   }
   const content = readFileSync(metadataPath, 'utf-8')
   const metadata = loadYaml(content)
   if (metadata?.version_combinations) {
-    validateVersionPairs(metadata.version_combinations, suiteKey)
+    validateSpecificationVersionPairs(suiteType, metadata.version_combinations, caseKey)
     return { versionPairs: metadata.version_combinations }
   }
   return null
@@ -77,15 +82,15 @@ const getDirectories = (basePath) =>
 const suitesMap = []
 const metaMap = []
 
-for (const suiteType of getDirectories(COMPATIBILITY_SUITES_PATH)) {
-  const ext = suiteType === TEST_SPEC_TYPE_GRAPH_QL ? 'graphql' : 'yaml'
+for (const suiteType of getDirectories(COMPATIBILITY_SUITES_DIR)) {
+  const ext = getSampleFileExt(suiteType)
 
-  for (const suiteId of getDirectories(`${COMPATIBILITY_SUITES_PATH}/${suiteType}`)) {
-    for (const testId of getDirectories(`${COMPATIBILITY_SUITES_PATH}/${suiteType}/${suiteId}`)) {
-      const basePath = `${COMPATIBILITY_SUITES_PATH}/${suiteType}/${suiteId}/${testId}`
-      const beforePath = `${basePath}/before.${ext}`
-      const afterPath = `${basePath}/after.${ext}`
-      const suiteKey = `${suiteType}/${suiteId}/${testId}`
+  for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteType))) {
+    for (const testId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteType, suiteId))) {
+      const basePath = path.join(COMPATIBILITY_SUITES_DIR, suiteType, suiteId, testId)
+      const beforePath = path.join(basePath, `before.${ext}`)
+      const afterPath = path.join(basePath, `after.${ext}`)
+      const caseKey = buildCaseKey(suiteType, suiteId, testId)
 
       const beforeExists = existsSync(beforePath)
       const afterExists = existsSync(afterPath)
@@ -93,26 +98,22 @@ for (const suiteType of getDirectories(COMPATIBILITY_SUITES_PATH)) {
         const missing = []
         if (!beforeExists) missing.push(beforePath)
         if (!afterExists) missing.push(afterPath)
-        throw new Error(`Missing compatibility suite sample(s) for '${suiteKey}': ${missing.join(', ')}`)
+        throw new Error(`Missing compatibility suite sample(s) for '${caseKey}': ${missing.join(', ')}`)
       }
 
       const before = readFileSync(beforePath, 'utf-8')
       const after = readFileSync(afterPath, 'utf-8')
-      suitesMap.push([suiteKey, { before, after }])
+      suitesMap.push([caseKey, { before, after }])
 
       // OpenAPI-only: GraphQL suites do not participate in OpenAPI version matrix.
       if (suiteType === TEST_SPEC_TYPE_OPEN_API) {
-        const metadata = parseMetadata(`${basePath}/metadata.yaml`, suiteKey)
+        const metadata = parseMetadata(path.join(basePath, METADATA_FILE_NAME), caseKey, suiteType)
         if (metadata) {
-          metaMap.push([suiteKey, metadata])
+          metaMap.push([caseKey, metadata])
         }
       }
     }
   }
-}
-
-if (!existsSync('./generation')) {
-  mkdirSync('./generation')
 }
 
 // Stable output (avoid noisy diffs across filesystems/OS).
@@ -124,18 +125,81 @@ export const TEST_SPEC_TYPE_GRAPH_QL = '${TEST_SPEC_TYPE_GRAPH_QL}'
 
 export type TestSpecType = typeof TEST_SPEC_TYPE_OPEN_API | typeof TEST_SPEC_TYPE_GRAPH_QL
 
-export type OpenApiVersion = string
-export type OpenApiVersionPair = [OpenApiVersion, OpenApiVersion]
+export type SpecificationVersion = string
+export type SpecificationVersionPair = [SpecificationVersion, SpecificationVersion]
+
+// Logical case key (NOT a filesystem path).
+const CASE_KEY_SEPARATOR = '${CASE_KEY_SEPARATOR}'
+const buildCaseKey = (suiteType: TestSpecType, suiteId: string, testId: string): string =>
+  [suiteType, suiteId, testId].join(CASE_KEY_SEPARATOR)
 
 type CompatibilitySuiteMeta = {
-  versionPairs: OpenApiVersionPair[]
+  versionPairs: SpecificationVersionPair[]
 }
 
 // Default OpenAPI version pair for cases without metadata.yaml.
 // Used only for enumeration/grouping (major.minor); such cases are canonical and never patched.
-const DEFAULT_OPENAPI_VERSION_PAIR: OpenApiVersionPair = ['3.0.0', '3.0.0']
+const DEFAULT_OPENAPI_VERSION_PAIR: SpecificationVersionPair = ['3.0.0', '3.0.0']
 
-const patchOpenapi = (source: string, version: string): string => {
+// Non-OpenAPI suites currently do not participate in any version matrix.
+// Keep a stable stub for external contract (future-proofing).
+const DEFAULT_NON_OPENAPI_VERSION_PAIR: SpecificationVersionPair = ['unversioned', 'unversioned']
+
+type VersionPairPolicy = {
+  defaultPair: SpecificationVersionPair
+  patchSamples?: (
+    before: string,
+    after: string,
+    specificationVersionPair: SpecificationVersionPair,
+  ) => [string, string]
+}
+
+// Configuration per suiteType. Extend this map to support specificationVersionPair for new suite types.
+const VERSION_PAIR_POLICY_BY_SUITE_TYPE: Record<TestSpecType, VersionPairPolicy> = {
+  [TEST_SPEC_TYPE_OPEN_API]: {
+    defaultPair: DEFAULT_OPENAPI_VERSION_PAIR,
+    patchSamples: (before, after, specificationVersionPair) => [
+      patchOpenApiVersion(before, specificationVersionPair[0]),
+      patchOpenApiVersion(after, specificationVersionPair[1]),
+    ],
+  },
+  [TEST_SPEC_TYPE_GRAPH_QL]: {
+    defaultPair: DEFAULT_NON_OPENAPI_VERSION_PAIR,
+  },
+}
+
+/**
+ * Returns the version-pair policy for a suite type (default pair + optional patch strategy).
+ * Throws if suiteType has no VersionPairPolicy entry.
+ */
+const getVersionPairPolicy = (suiteType: TestSpecType): VersionPairPolicy => {
+  const policy = VERSION_PAIR_POLICY_BY_SUITE_TYPE[suiteType]
+  if (!policy) {
+    // Should never happen because suiteType is a union, but keep a clear runtime error.
+    throw new Error(\`Unknown suiteType for VersionPairPolicy lookup: \${suiteType}\`)
+  }
+  return policy
+}
+
+/**
+ * Returns version pairs declared in metadata.yaml for the case, or undefined when metadata is absent.
+ * Note: currently metadata-based version pairs are supported only for OpenAPI.
+ */
+const getMetadataVersionPairs = (
+  suiteType: TestSpecType,
+  caseKey: string,
+): SpecificationVersionPair[] | undefined => {
+  if (suiteType !== TEST_SPEC_TYPE_OPEN_API) {
+    return undefined
+  }
+  return CompatibilitySuiteMetaMap.get(caseKey)?.versionPairs
+}
+
+/**
+ * Patches only the root "openapi:" line in an OpenAPI YAML string.
+ * Throws if the root "openapi" field is missing.
+ */
+const patchOpenApiVersion = (source: string, version: string): string => {
   const pattern = /^openapi:\\s*.*$/m
   if (!pattern.test(source)) {
     throw new Error('Invalid OpenAPI sample: missing root "openapi" field')
@@ -144,82 +208,84 @@ const patchOpenapi = (source: string, version: string): string => {
 }
 
 /**
- * Returns supported OpenAPI version pairs for an OpenAPI case.
+ * Returns supported specification version pairs for a compatibility suite case.
  *
- * - With metadata.yaml: returns declared version pairs (order preserved).
- * - Without metadata.yaml: returns a single default pair for enumeration/grouping.
+ * - OpenAPI:
+ *   - With metadata.yaml: returns declared version pairs (order preserved).
+ *   - Without metadata.yaml: returns a single default pair for enumeration/grouping.
+ * - Non-OpenAPI: returns a single default pair (stub; no version matrix yet).
  */
-export const getOpenApiCompatibilitySuiteVersionPairs = (
+export const getCompatibilitySuiteSpecificationVersionPairs = (
+  suiteType: TestSpecType,
   suiteId: string,
   testId: string,
-): OpenApiVersionPair[] => {
-  const suiteKey = \`\${TEST_SPEC_TYPE_OPEN_API}/\${suiteId}/\${testId}\`
+): SpecificationVersionPair[] => {
+  const caseKey = buildCaseKey(suiteType, suiteId, testId)
 
-  if (!CompatibilitySuiteMap.has(suiteKey)) {
-    throw new Error(\`Unknown compatibility suite case: (\${TEST_SPEC_TYPE_OPEN_API}, \${suiteId}, \${testId})\`)
+  if (!CompatibilitySuiteMap.has(caseKey)) {
+    throw new Error(\`Unknown compatibility suite case: (\${suiteType}, \${suiteId}, \${testId})\`)
   }
 
-  const meta = CompatibilitySuiteMetaMap.get(suiteKey)
-  return meta ? meta.versionPairs : [DEFAULT_OPENAPI_VERSION_PAIR]
+  const versionPairPolicy = getVersionPairPolicy(suiteType)
+  const metadataVersionPairs = getMetadataVersionPairs(suiteType, caseKey)
+  return metadataVersionPairs ? metadataVersionPairs : [versionPairPolicy.defaultPair]
 }
 
 /**
  * Returns before/after samples for a compatibility suite case.
  *
- * - If openApiVersionPair is not provided: returns stored samples as-is.
- * - If openApiVersionPair is provided:
- *   - non-OpenAPI suite types: throws (OpenAPI version matrix does not apply).
- *   - OpenAPI case without metadata.yaml: returns stored samples as-is (canonical; no patching).
- *   - OpenAPI case with metadata.yaml: patches root "openapi" in both samples and returns patched strings.
+ * - If specificationVersionPair is not provided: returns stored samples as-is.
+ * - If specificationVersionPair is provided:
+ *   - suite types without a version-pair patch strategy: throws (currently OpenAPI-only).
+ *   - case without metadata.yaml: returns stored samples as-is (canonical; no patching).
+ *   - case with metadata.yaml: patches samples according to the provided pair and returns patched strings.
  */
 export const getCompatibilitySuite = (
   suiteType: TestSpecType,
   suiteId: string,
   testId: string,
-  openApiVersionPair?: OpenApiVersionPair,
+  specificationVersionPair?: SpecificationVersionPair,
 ): [string, string] => {
-  const suiteKey = \`\${suiteType}/\${suiteId}/\${testId}\`
-  const suite = CompatibilitySuiteMap.get(suiteKey)
+  const caseKey = buildCaseKey(suiteType, suiteId, testId)
+  const suite = CompatibilitySuiteMap.get(caseKey)
   if (!suite) {
     return ['', '']
   }
 
-  if (suiteType !== TEST_SPEC_TYPE_OPEN_API) {
-    if (openApiVersionPair !== undefined) {
-      throw new Error(
-        \`openApiVersionPair is supported only for OpenAPI cases: (\${suiteType}, \${suiteId}, \${testId})\`
-      )
-    }
+  if (specificationVersionPair === undefined) {
     return [suite.before, suite.after]
   }
 
-  if (openApiVersionPair === undefined) {
-    return [suite.before, suite.after]
-  }
+  const versionPairPolicy = getVersionPairPolicy(suiteType)
 
-  const supportedPairs = getOpenApiCompatibilitySuiteVersionPairs(suiteId, testId)
-
-  // Guard against passing an arbitrary OpenAPI version pair:
-  // allow only pairs declared for the case (or the OpenAPI default stub when metadata is absent).
-  const isSupported = supportedPairs.some(
-    (pair) => pair[0] === openApiVersionPair[0] && pair[1] === openApiVersionPair[1]
-  )
-  if (!isSupported) {
+  if (!versionPairPolicy.patchSamples) {
     throw new Error(
-      \`Unsupported OpenAPI version pair [\${openApiVersionPair[0]}, \${openApiVersionPair[1]}] for case (\${suiteType}, \${suiteId}, \${testId})\`
+      \`specificationVersionPair is currently supported only for OpenAPI cases: (\${suiteType}, \${suiteId}, \${testId})\`
     )
   }
 
-  // If metadata exists -> always patch (even for single pair)
-  const hasMetadata = CompatibilitySuiteMetaMap.has(suiteKey)
-  if (!hasMetadata) {
+  const supportedPairs = getCompatibilitySuiteSpecificationVersionPairs(suiteType, suiteId, testId)
+
+  // Guard against passing an arbitrary version pair:
+  // allow only pairs declared for the case (or the suite-type default stub when metadata is absent).
+  const isSupported = supportedPairs.some(
+    (pair) => pair[0] === specificationVersionPair[0] && pair[1] === specificationVersionPair[1]
+  )
+  if (!isSupported) {
+    throw new Error(
+      \`Unsupported specificationVersionPair [\${specificationVersionPair[0]}, \${specificationVersionPair[1]}] for case (\${suiteType}, \${suiteId}, \${testId})\`
+    )
+  }
+
+  // Patching semantics:
+  // - without metadata.yaml: samples are canonical, never patched.
+  // - with metadata.yaml: always patch (even for single pair).
+  const metadataVersionPairs = getMetadataVersionPairs(suiteType, caseKey)
+  if (!metadataVersionPairs) {
     return [suite.before, suite.after]
   }
 
-  return [
-    patchOpenapi(suite.before, openApiVersionPair[0]),
-    patchOpenapi(suite.after, openApiVersionPair[1]),
-  ]
+  return versionPairPolicy.patchSamples(suite.before, suite.after, specificationVersionPair)
 }
 
 /**
@@ -229,8 +295,8 @@ export const getCompatibilitySuite = (
  * Note: enumeration-only; does not return samples/metadata.
  */
 export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, string[]> => {
-  return [...CompatibilitySuiteMap.keys()].reduce((result, key) => {
-    const [suiteType, suiteId, testId] = key.split('/')
+  return [...CompatibilitySuiteMap.keys()].reduce((result, caseKey) => {
+    const [suiteType, suiteId, testId] = caseKey.split(CASE_KEY_SEPARATOR)
     if (specType && specType !== suiteType) {
       return result
     }
@@ -244,4 +310,5 @@ const CompatibilitySuiteMap = new Map(${JSON.stringify(suitesMap)})
 const CompatibilitySuiteMetaMap = new Map<string, CompatibilitySuiteMeta>(${JSON.stringify(metaMap)})
 `
 
-writeFileSync('./generation/suite-service.ts', BASE_SUITE_SERVICE)
+mkdirSync(path.dirname(GENERATED_SUITE_SERVICE_PATH), { recursive: true })
+writeFileSync(GENERATED_SUITE_SERVICE_PATH, BASE_SUITE_SERVICE)
