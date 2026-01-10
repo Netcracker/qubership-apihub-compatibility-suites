@@ -20,7 +20,7 @@
     "build": "npm run generate && vite build",
     "development:link": "npm link",
     "development:unlink": "npm unlink",
-    "generate": "node bin/generate-suite-service.js",
+    "generate": "node bin/generate-suite-data.js",
     "type-check": "npm run generate && tsc -p tsconfig.json --noEmit",
     "update-lock-file": "update-lock-file @netcracker"
   },

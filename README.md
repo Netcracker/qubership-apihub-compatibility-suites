@@ -7,6 +7,7 @@ It is a collection of most important cases of changes in API for the purposes of
 Contains cases for OpenAPI and GraphQL
 
 ## Structure
+
 The cases path structure is `bin/comparison-base-suite/<apitype>/<case-suite>/<specific-case>`
 Each case contains two specifications - `before` and `after`.
 
@@ -20,6 +21,7 @@ OpenAPI cases may additionally contain `metadata.yaml` with a version matrix:
 - Only OAS `3.0.x` and `3.1.x` are supported (other versions are rejected by the generator).
 
 ## Usages
+
 When used as a dependency, it exposes a JavaScript map of cases (prebuilt in `dist/`), which can be accessed using the public API methods below.
 
 ```ts
@@ -64,9 +66,9 @@ It returns a pair of strings: `[before, after]`.
 
 ## Development model (code generation)
 
-This package generates `generation/suite-service.ts` from `bin/comparison-base-suite/**` during development.
+This package generates `generated/suite-data.ts` from `bin/comparison-base-suite/**` during development.
 
-- After changing compatibility suite cases or OpenAPI metadata in this repository, run `npm run generate` (or `npm run build`) to refresh `generation/suite-service.ts`.
+- After changing compatibility suite cases or OpenAPI metadata in this repository, run `npm run generate` (or `npm run build`) to refresh `generated/suite-data.ts`.
 
 ## Used by (clients)
 
@@ -75,12 +77,14 @@ This package generates `generation/suite-service.ts` from `bin/comparison-base-s
 - [`Netcracker/qubership-apihub-api-doc-viewer`](https://github.com/Netcracker/qubership-apihub-api-doc-viewer): generates Storybook stories and screenshot tests to visualize compatibility suite cases (GraphQL).
 
 When writing tests, it is necessary to follow the structure of the compatibility suite:
+
 - test should be located in a folder separated from all other tests
 - tests should be grouped by specification types and suites
 - one suite should corresponds to one test-suite
 - one case corresponds to one test in a test suite.
 
 It is recommended to have a separate command to run only the compatibility suite tests
+
 ```json
 "scripts": {
   "test:compatibility-suites": "jest --detectOpenHandles test/compatibility-suites"

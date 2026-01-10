@@ -22,7 +22,7 @@
   },
   "include": [
     "index.ts",
-    "generation/**/*.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
