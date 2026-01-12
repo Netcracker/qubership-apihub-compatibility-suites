@@ -22,6 +22,7 @@
   },
   "include": [
     "index.ts",
+    "bin/**/*.ts",
     "src/**/*.ts"
   ],
   "exclude": [

@@ -1,17 +1,17 @@
 import { CompatibilitySuiteMap, CompatibilitySuiteMetaMap } from '../generated/suite-data'
+import {
+  buildCaseKey,
+  CASE_KEY_SEPARATOR,
+  TEST_SPEC_TYPE_GRAPH_QL,
+  TEST_SPEC_TYPE_OPEN_API,
+  type TestSpecType,
+} from './suite-shared'
 
-export const TEST_SPEC_TYPE_OPEN_API = 'openapi'
-export const TEST_SPEC_TYPE_GRAPH_QL = 'graphql'
-
-export type TestSpecType = typeof TEST_SPEC_TYPE_OPEN_API | typeof TEST_SPEC_TYPE_GRAPH_QL
+export { TEST_SPEC_TYPE_GRAPH_QL, TEST_SPEC_TYPE_OPEN_API }
+export type { TestSpecType }
 
 export type SpecificationVersion = string
 export type SpecificationVersionPair = [SpecificationVersion, SpecificationVersion]
-
-// Logical case key (NOT a filesystem path).
-const CASE_KEY_SEPARATOR = '/'
-const buildCaseKey = (suiteType: TestSpecType, suiteId: string, testId: string): string =>
-  [suiteType, suiteId, testId].join(CASE_KEY_SEPARATOR)
 
 // Default OpenAPI version pair for cases without metadata.yaml.
 // Used only for enumeration/grouping (major.minor); such cases are canonical and never patched.

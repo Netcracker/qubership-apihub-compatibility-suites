@@ -4,6 +4,8 @@ import path from 'path'
 import { exit } from 'process'
 import { fileURLToPath } from 'url'
 
+import { buildCaseKey, TEST_SPEC_TYPE_GRAPH_QL, TEST_SPEC_TYPE_OPEN_API, type TestSpecType } from '../src/suite-shared'
+
 // Prevent running generators from an installed package in node_modules.
 // We only generate when executing from the repo workspace at: <PACKAGE_ROOT>/bin/*
 const scriptFilePath = fileURLToPath(import.meta.url)
@@ -15,42 +17,49 @@ if (PACKAGE_ROOT.split(path.sep).includes('node_modules')) {
 
 const COMPATIBILITY_SUITES_DIR = path.join(PACKAGE_ROOT, 'bin', 'comparison-base-suite')
 
-const TEST_SPEC_TYPE_OPEN_API = 'openapi'
-const TEST_SPEC_TYPE_GRAPH_QL = 'graphql'
-
 const DEFAULT_SPEC_SAMPLE_FILE_EXT = 'yaml'
 const GRAPHQL_SAMPLE_FILE_EXT = 'graphql'
-const SPEC_SAMPLE_FILE_EXT_BY_SUITE_TYPE = {
+
+const SPEC_SAMPLE_FILE_EXT_BY_SUITE_TYPE: Record<TestSpecType, string> = {
+  [TEST_SPEC_TYPE_OPEN_API]: DEFAULT_SPEC_SAMPLE_FILE_EXT,
   [TEST_SPEC_TYPE_GRAPH_QL]: GRAPHQL_SAMPLE_FILE_EXT,
 }
-const getSampleFileExt = (suiteType) => SPEC_SAMPLE_FILE_EXT_BY_SUITE_TYPE[suiteType] ?? DEFAULT_SPEC_SAMPLE_FILE_EXT
+const getSampleFileExt = (suiteType: TestSpecType): string => SPEC_SAMPLE_FILE_EXT_BY_SUITE_TYPE[suiteType]
 
 const METADATA_FILE_NAME = 'metadata.yaml'
 
 const GENERATED_SUITE_DATA_PATH = path.join(PACKAGE_ROOT, 'generated', 'suite-data.ts')
 
-const VALID_OPENAPI_MAJOR_MINORS = ['3.0', '3.1']
+const VALID_OPENAPI_MAJOR_MINORS = ['3.0', '3.1'] as const
 
-// Logical case key (NOT a filesystem path). We use '/' for readability/stability.
-const CASE_KEY_SEPARATOR = '/'
-const buildCaseKey = (suiteType, suiteId, testId) => [suiteType, suiteId, testId].join(CASE_KEY_SEPARATOR)
+type CompatibilitySuite = { before: string; after: string }
+type CompatibilitySuiteMeta = { versionPairs: [string, string][] }
 
-const validateSpecificationVersionPairs = (suiteType, versionPairs, caseKey) => {
-  if (!Array.isArray(versionPairs) || versionPairs.length === 0) {
+const isUnknownArray = (value: unknown): value is unknown[] => Array.isArray(value)
+
+const validateSpecificationVersionPairs = (
+  suiteType: TestSpecType,
+  versionPairs: unknown,
+  caseKey: string,
+): void => {
+  if (!isUnknownArray(versionPairs) || versionPairs.length === 0) {
     throw new Error(`Invalid metadata for case '${caseKey}': version_combinations must be a non-empty array`)
   }
   for (const pair of versionPairs) {
-    if (!Array.isArray(pair) || pair.length !== 2) {
+    if (!isUnknownArray(pair) || pair.length !== 2) {
       throw new Error(`Invalid metadata for case '${caseKey}': each version pair must be a 2-item array`)
     }
-    for (const version of pair) {
-      if (typeof version !== 'string') {
-        throw new Error(`Invalid metadata for case '${caseKey}': version must be a string`)
-      }
-      // OpenAPI-only: strictly accept only 3.0.x and 3.1.x.
-      if (suiteType === TEST_SPEC_TYPE_OPEN_API) {
+
+    const [beforeVersion, afterVersion] = pair
+    if (typeof beforeVersion !== 'string' || typeof afterVersion !== 'string') {
+      throw new Error(`Invalid metadata for case '${caseKey}': version must be a string`)
+    }
+
+    // OpenAPI-only: strictly accept only 3.0.x and 3.1.x.
+    if (suiteType === TEST_SPEC_TYPE_OPEN_API) {
+      for (const version of [beforeVersion, afterVersion]) {
         const majorMinor = version.startsWith('3.0.') ? '3.0' : version.startsWith('3.1.') ? '3.1' : null
-        if (!VALID_OPENAPI_MAJOR_MINORS.includes(majorMinor)) {
+        if (!majorMinor || !VALID_OPENAPI_MAJOR_MINORS.includes(majorMinor)) {
           throw new Error(`Invalid metadata for case '${caseKey}': unsupported OpenAPI version '${version}'`)
         }
       }
@@ -58,29 +67,43 @@ const validateSpecificationVersionPairs = (suiteType, versionPairs, caseKey) => 
   }
 }
 
-const parseMetadata = (metadataPath, caseKey, suiteType) => {
+const parseMetadata = (
+  metadataPath: string,
+  caseKey: string,
+  suiteType: TestSpecType,
+): CompatibilitySuiteMeta | null => {
   if (!existsSync(metadataPath)) {
     return null
   }
   const content = readFileSync(metadataPath, 'utf-8')
-  const metadata = loadYaml(content)
-  if (metadata?.version_combinations) {
-    validateSpecificationVersionPairs(suiteType, metadata.version_combinations, caseKey)
-    return { versionPairs: metadata.version_combinations }
+  const metadata: unknown = loadYaml(content)
+  if (!metadata || typeof metadata !== 'object') {
+    return null
   }
-  return null
+
+  const versionCombinations = (metadata as Record<string, unknown>).version_combinations
+  if (versionCombinations === undefined) {
+    return null
+  }
+
+  validateSpecificationVersionPairs(suiteType, versionCombinations, caseKey)
+  return { versionPairs: versionCombinations as CompatibilitySuiteMeta['versionPairs'] }
 }
 
-const getDirectories = (basePath) =>
+const getDirectories = (basePath: string): string[] =>
   readdirSync(basePath, { withFileTypes: true })
-    .filter((dir) => dir.isDirectory())
-    .map((dir) => dir.name)
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name)
     .sort()
 
-const suitesMap = []
-const metaMap = []
+const suitesMap: Array<[string, CompatibilitySuite]> = []
+const metaMap: Array<[string, CompatibilitySuiteMeta]> = []
 
-for (const suiteType of getDirectories(COMPATIBILITY_SUITES_DIR)) {
+for (const suiteTypeDir of getDirectories(COMPATIBILITY_SUITES_DIR)) {
+  if (suiteTypeDir !== TEST_SPEC_TYPE_OPEN_API && suiteTypeDir !== TEST_SPEC_TYPE_GRAPH_QL) {
+    throw new Error(`Unknown suiteType directory: ${suiteTypeDir}`)
+  }
+  const suiteType: TestSpecType = suiteTypeDir
   const ext = getSampleFileExt(suiteType)
 
   for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteType))) {
@@ -93,7 +116,7 @@ for (const suiteType of getDirectories(COMPATIBILITY_SUITES_DIR)) {
       const beforeExists = existsSync(beforePath)
       const afterExists = existsSync(afterPath)
       if (!beforeExists || !afterExists) {
-        const missing = []
+        const missing: string[] = []
         if (!beforeExists) missing.push(beforePath)
         if (!afterExists) missing.push(afterPath)
         throw new Error(`Missing compatibility suite sample(s) for '${caseKey}': ${missing.join(', ')}`)
