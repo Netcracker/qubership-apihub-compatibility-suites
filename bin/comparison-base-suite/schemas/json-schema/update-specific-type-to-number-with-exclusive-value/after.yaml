@@ -1,0 +1,3 @@
+type: number
+exclusiveMaximum: true
+exclusiveMinimum: true

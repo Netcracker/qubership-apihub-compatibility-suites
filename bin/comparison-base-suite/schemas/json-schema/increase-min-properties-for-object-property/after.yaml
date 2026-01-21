@@ -1,0 +1,7 @@
+type: object
+minProperties: 2
+properties:
+  prop1:
+    type: string
+  prop2:
+    type: number

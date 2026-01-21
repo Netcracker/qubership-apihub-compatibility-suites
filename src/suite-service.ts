@@ -1,4 +1,10 @@
-import { CompatibilitySuiteMap, CompatibilitySuiteMetaMap } from '../generated/suite-data'
+import {
+  CompatibilitySuiteMap,
+  CompatibilitySuiteMetaMap,
+  JsonSchemaCaseMap,
+  SchemaScopeTemplateMap,
+} from '../generated/suite-data'
+import { composeSchemaCase, isSchemaScope } from './schema-suites'
 import {
   buildCaseKey,
   CASE_KEY_SEPARATOR,
@@ -28,6 +34,39 @@ type VersionPairPolicy = {
     after: string,
     specificationVersionPair: SpecificationVersionPair,
   ) => [string, string]
+}
+
+/**
+ * Returns true when a case is backed by a schema-scope template + base store.
+ */
+const isKnownSchemaScopeCase = (suiteType: TestSpecType, suiteId: string, testId: string): boolean =>
+  isSchemaScope(suiteType, suiteId) && JsonSchemaCaseMap.has(testId)
+
+/**
+ * Returns samples from either a stored suite or a rendered schema scope.
+ */
+const resolveSuiteSamples = (
+  suiteType: TestSpecType,
+  suiteId: string,
+  testId: string,
+): [string, string] | null => {
+  const caseKey = buildCaseKey(suiteType, suiteId, testId)
+  const suite = CompatibilitySuiteMap.get(caseKey)
+  if (suite) {
+    return [suite.before, suite.after]
+  }
+
+  if (!isSchemaScope(suiteType, suiteId)) {
+    return null
+  }
+
+  const before = composeSchemaCase(suiteType, suiteId, testId, 'before')
+  const after = composeSchemaCase(suiteType, suiteId, testId, 'after')
+  if (!before && !after) {
+    return null
+  }
+
+  return [before, after]
 }
 
 // Configuration per suiteType. Extend this map to support specificationVersionPair for new suite types.
@@ -98,7 +137,7 @@ export const getCompatibilitySuiteSpecificationVersionPairs = (
 ): SpecificationVersionPair[] => {
   const caseKey = buildCaseKey(suiteType, suiteId, testId)
 
-  if (!CompatibilitySuiteMap.has(caseKey)) {
+  if (!CompatibilitySuiteMap.has(caseKey) && !isKnownSchemaScopeCase(suiteType, suiteId, testId)) {
     throw new Error(`Unknown compatibility suite case: (${suiteType}, ${suiteId}, ${testId})`)
   }
 
@@ -122,14 +161,13 @@ export const getCompatibilitySuite = (
   testId: string,
   specificationVersionPair?: SpecificationVersionPair,
 ): [string, string] => {
-  const caseKey = buildCaseKey(suiteType, suiteId, testId)
-  const suite = CompatibilitySuiteMap.get(caseKey)
-  if (!suite) {
+  const suiteSamples = resolveSuiteSamples(suiteType, suiteId, testId)
+  if (!suiteSamples) {
     return ['', '']
   }
 
   if (specificationVersionPair === undefined) {
-    return [suite.before, suite.after]
+    return suiteSamples
   }
 
   const versionPairPolicy = getVersionPairPolicy(suiteType)
@@ -158,12 +196,13 @@ export const getCompatibilitySuite = (
   // Patching semantics:
   // - without metadata.yaml: samples are canonical, never patched.
   // - with metadata.yaml: always patch (even for single pair).
+  const caseKey = buildCaseKey(suiteType, suiteId, testId)
   const metadataVersionPairs = getMetadataVersionPairs(suiteType, caseKey)
   if (!metadataVersionPairs) {
-    return [suite.before, suite.after]
+    return suiteSamples
   }
 
-  return versionPairPolicy.patchSamples(suite.before, suite.after, specificationVersionPair)
+  return versionPairPolicy.patchSamples(suiteSamples[0], suiteSamples[1], specificationVersionPair)
 }
 
 /**
@@ -173,7 +212,7 @@ export const getCompatibilitySuite = (
  * Note: enumeration-only; does not return samples/metadata.
  */
 export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, string[]> => {
-  return [...CompatibilitySuiteMap.keys()].reduce((result, caseKey) => {
+  const suites = [...CompatibilitySuiteMap.keys()].reduce((result, caseKey) => {
     const [suiteType, suiteId, testId] = caseKey.split(CASE_KEY_SEPARATOR)
     if (specType && specType !== suiteType) {
       return result
@@ -182,4 +221,15 @@ export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, str
     result.set(suiteId, testIds ? [...testIds, testId] : [testId])
     return result
   }, new Map()) as Map<string, string[]>
+
+  const schemaCaseIds = [...JsonSchemaCaseMap.keys()]
+  for (const templateKey of SchemaScopeTemplateMap.keys()) {
+    const [suiteType, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
+    if (specType && specType !== suiteType) {
+      continue
+    }
+    suites.set(suiteId, [...schemaCaseIds])
+  }
+
+  return suites
 }

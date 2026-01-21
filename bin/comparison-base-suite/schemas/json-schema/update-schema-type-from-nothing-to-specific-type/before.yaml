@@ -1,0 +1,4 @@
+allOf:
+  - type: object
+  - type: string
+

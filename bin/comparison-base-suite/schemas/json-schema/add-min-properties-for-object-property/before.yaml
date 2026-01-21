@@ -1,0 +1,10 @@
+properties:
+  option1:
+    minProperties: 0
+    properties:
+      prop1:
+        type: string
+  option2:
+    properties:
+      prop1:
+        type: string
