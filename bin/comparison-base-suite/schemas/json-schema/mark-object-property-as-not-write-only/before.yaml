@@ -3,5 +3,5 @@ properties:
     type: string
     writeOnly: true
   option2:
-    type: string
+    type: number
     writeOnly: true

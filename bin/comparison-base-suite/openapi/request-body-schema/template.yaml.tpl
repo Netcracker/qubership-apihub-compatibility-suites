@@ -1,6 +1,6 @@
 openapi: 3.0.4
 info:
-  title: CS schema case (generated)
+  title: schema case (generated)
   version: 1.0.0
 paths:
   /path1:

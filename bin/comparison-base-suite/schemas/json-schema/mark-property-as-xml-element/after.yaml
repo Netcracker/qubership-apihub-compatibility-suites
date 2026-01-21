@@ -2,6 +2,6 @@ properties:
   option1:
     type: integer
   option2:
-    type: integer
+    type: string
     xml:
       attribute: false

@@ -4,6 +4,6 @@ properties:
     xml:
       attribute: true
   option2:
-    type: integer
+    type: string
     xml:
       attribute: true
