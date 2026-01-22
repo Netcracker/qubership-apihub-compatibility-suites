@@ -1,3 +1,4 @@
+description: to an equivalent
 anyOf:
   - type: string
   - type: number

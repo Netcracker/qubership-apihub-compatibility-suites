@@ -1,3 +1,4 @@
+description: nothing to specific
 allOf:
   - type: object
   - type: string

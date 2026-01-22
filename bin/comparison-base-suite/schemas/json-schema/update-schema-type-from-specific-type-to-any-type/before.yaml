@@ -1,6 +1,2 @@
-properties:
-  option1:
-    type: string
-  option2:
-    type: string
-    description: abc
+description: specific to any
+type: string
