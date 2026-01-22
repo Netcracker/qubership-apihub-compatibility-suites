@@ -1,4 +1,0 @@
-description: nothing to string
-allOf:
-  - type: string
-  - type: number
