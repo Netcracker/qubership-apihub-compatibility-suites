@@ -1,4 +1,4 @@
 type: array
 minItems: 0
 items:
-    type: string
+  type: string

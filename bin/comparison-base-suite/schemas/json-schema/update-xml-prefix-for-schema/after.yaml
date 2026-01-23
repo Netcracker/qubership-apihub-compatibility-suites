@@ -3,5 +3,5 @@ properties:
   id:
     type: integer
 xml:
-  prefix: 'p2'
-  namespace: 'http://example.com/schema'
+  prefix: "p2"
+  namespace: "http://example.com/schema"

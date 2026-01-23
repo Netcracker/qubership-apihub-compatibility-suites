@@ -5,5 +5,5 @@ anyOf:
   - type: integer
   - type: boolean
   - type: array
-    items: { }
+    items: {}
   - type: object

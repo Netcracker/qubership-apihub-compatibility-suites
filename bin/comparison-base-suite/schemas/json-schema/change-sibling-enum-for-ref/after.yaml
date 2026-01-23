@@ -1,4 +1,4 @@
-$ref: '#/components/schemas/Color'
+$ref: "#/components/schemas/Color"
 enum:
   - black
   - white

@@ -3,4 +3,4 @@ properties:
   id:
     type: integer
     xml:
-      name: 'xml-id-2'
+      name: "xml-id-2"

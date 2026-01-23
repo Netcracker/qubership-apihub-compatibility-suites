@@ -4,4 +4,4 @@ properties:
     additionalProperties: true
   option2:
     type: object
-    additionalProperties: { }
+    additionalProperties: {}

@@ -1,2 +1,2 @@
-$ref: '#/components/schemas/Pet'
+$ref: "#/components/schemas/Pet"
 description: schema description override

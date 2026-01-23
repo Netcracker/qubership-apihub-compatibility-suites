@@ -1,1 +1,1 @@
-type: [string, integer]  # Union of two types
+type: [string, integer] # Union of two types

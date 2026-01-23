@@ -5,7 +5,7 @@ required:
 properties:
   prop1:
     type: string
-    default: 'Sample'
+    default: "Sample"
   prop2:
     type: number
     default: 5

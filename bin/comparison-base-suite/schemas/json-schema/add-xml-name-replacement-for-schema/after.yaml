@@ -7,4 +7,4 @@ properties:
   author:
     type: string
 xml:
-  name: 'xml-book'
+  name: "xml-book"
