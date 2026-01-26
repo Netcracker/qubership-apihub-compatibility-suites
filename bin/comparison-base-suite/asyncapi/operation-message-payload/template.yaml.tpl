@@ -1,6 +1,6 @@
 asyncapi: 3.0.0
 info:
-  title: CS schema case (generated)
+  title: asyncapi schema case (generated)
   version: 1.0.0
 channels:
   requestChannel:
