@@ -1,10 +1,4 @@
+type: object
 properties:
-  option1:
-    minProperties: 0
-    properties:
-      prop1:
-        type: string
-  option2:
-    properties:
-      prop1:
-        type: string
+  prop1:
+    type: string
