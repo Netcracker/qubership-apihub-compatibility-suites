@@ -8,12 +8,13 @@ import { composeSchemaCase, isSchemaScope } from './schema-suites'
 import {
   buildCaseKey,
   CASE_KEY_SEPARATOR,
+  TEST_SPEC_TYPE_ASYNC_API,
   TEST_SPEC_TYPE_GRAPH_QL,
   TEST_SPEC_TYPE_OPEN_API,
   type TestSpecType,
 } from './suite-shared'
 
-export { TEST_SPEC_TYPE_GRAPH_QL, TEST_SPEC_TYPE_OPEN_API }
+export { TEST_SPEC_TYPE_ASYNC_API, TEST_SPEC_TYPE_GRAPH_QL, TEST_SPEC_TYPE_OPEN_API }
 export type { TestSpecType }
 
 export type SpecificationVersion = string
@@ -79,6 +80,9 @@ const VERSION_PAIR_POLICY_BY_SUITE_TYPE: Record<TestSpecType, VersionPairPolicy>
     ],
   },
   [TEST_SPEC_TYPE_GRAPH_QL]: {
+    defaultPair: DEFAULT_NON_OPENAPI_VERSION_PAIR,
+  },
+  [TEST_SPEC_TYPE_ASYNC_API]: {
     defaultPair: DEFAULT_NON_OPENAPI_VERSION_PAIR,
   },
 }
@@ -224,7 +228,11 @@ export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, str
 
   const schemaCaseIds = [...JsonSchemaCaseMap.keys()]
   for (const templateKey of SchemaScopeTemplateMap.keys()) {
-    const [suiteType, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
+    const [suiteTypeRaw, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
+    const suiteType = suiteTypeRaw as TestSpecType
+    if (!isSchemaScope(suiteType, suiteId)) {
+      continue
+    }
     if (specType && specType !== suiteType) {
       continue
     }

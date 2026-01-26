@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url'
 import {
   buildCaseKey,
   CASE_KEY_SEPARATOR,
+  TEST_SPEC_TYPE_ASYNC_API,
   TEST_SPEC_TYPE_GRAPH_QL,
   TEST_SPEC_TYPE_OPEN_API,
   type TestSpecType,
@@ -32,6 +33,7 @@ const SCHEMA_TEMPLATE_FILE_NAME = 'template.yaml.tpl'
 const SPEC_SAMPLE_FILE_EXT_BY_SUITE_TYPE: Record<TestSpecType, string> = {
   [TEST_SPEC_TYPE_OPEN_API]: DEFAULT_SPEC_SAMPLE_FILE_EXT,
   [TEST_SPEC_TYPE_GRAPH_QL]: GRAPHQL_SAMPLE_FILE_EXT,
+  [TEST_SPEC_TYPE_ASYNC_API]: DEFAULT_SPEC_SAMPLE_FILE_EXT,
 }
 const getSampleFileExt = (suiteType: TestSpecType): string => SPEC_SAMPLE_FILE_EXT_BY_SUITE_TYPE[suiteType]
 
@@ -116,6 +118,11 @@ const schemaCaseMap: Array<[string, JsonSchemaCase]> = []
 const schemaScopeTemplateMap: Array<[string, string]> = []
 const schemaScopeTemplateKeys = new Set<string>()
 
+const isKnownSuiteType = (suiteTypeDir: string): suiteTypeDir is TestSpecType =>
+  suiteTypeDir === TEST_SPEC_TYPE_OPEN_API ||
+  suiteTypeDir === TEST_SPEC_TYPE_GRAPH_QL ||
+  suiteTypeDir === TEST_SPEC_TYPE_ASYNC_API
+
 if (existsSync(SCHEMA_BASE_STORE_DIR)) {
   for (const caseId of getDirectories(SCHEMA_BASE_STORE_DIR)) {
     const caseDir = path.join(SCHEMA_BASE_STORE_DIR, caseId)
@@ -133,7 +140,7 @@ if (existsSync(SCHEMA_BASE_STORE_DIR)) {
 const suiteTypeDirs = getDirectories(COMPATIBILITY_SUITES_DIR).filter((suiteTypeDir) => suiteTypeDir !== 'schemas')
 
 for (const suiteTypeDir of suiteTypeDirs) {
-  if (suiteTypeDir !== TEST_SPEC_TYPE_OPEN_API && suiteTypeDir !== TEST_SPEC_TYPE_GRAPH_QL) {
+  if (!isKnownSuiteType(suiteTypeDir)) {
     throw new Error(`Unknown suiteType directory: ${suiteTypeDir}`)
   }
   const suiteType: TestSpecType = suiteTypeDir
@@ -148,7 +155,7 @@ for (const suiteTypeDir of suiteTypeDirs) {
 }
 
 for (const suiteTypeDir of suiteTypeDirs) {
-  if (suiteTypeDir !== TEST_SPEC_TYPE_OPEN_API && suiteTypeDir !== TEST_SPEC_TYPE_GRAPH_QL) {
+  if (!isKnownSuiteType(suiteTypeDir)) {
     throw new Error(`Unknown suiteType directory: ${suiteTypeDir}`)
   }
   const suiteType: TestSpecType = suiteTypeDir
