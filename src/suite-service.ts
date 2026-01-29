@@ -4,15 +4,17 @@ import {
   JsonSchemaCaseMap,
   SchemaScopeTemplateMap,
 } from '../generated/suite-data'
-import { composeSchemaCase, isSchemaScope } from './schema-suites'
+import { OPENAPI_DEFAULT_VERSION_PAIR, patchOpenApiVersion } from './openapi/openapi-version'
+import { composeSchemaCase, isSchemaScope } from './schema/schema-suites'
 import {
   buildCaseKey,
   CASE_KEY_SEPARATOR,
+  isKnownSuiteType,
   TEST_SPEC_TYPE_ASYNC_API,
   TEST_SPEC_TYPE_GRAPH_QL,
   TEST_SPEC_TYPE_OPEN_API,
   type TestSpecType,
-} from './suite-shared'
+} from './shared/suite-shared'
 
 export { TEST_SPEC_TYPE_ASYNC_API, TEST_SPEC_TYPE_GRAPH_QL, TEST_SPEC_TYPE_OPEN_API }
 export type { TestSpecType }
@@ -22,7 +24,7 @@ export type SpecificationVersionPair = [SpecificationVersion, SpecificationVersi
 
 // Default OpenAPI version pair for cases without metadata.yaml.
 // Used only for enumeration/grouping (major.minor); such cases are canonical and never patched.
-const DEFAULT_OPENAPI_VERSION_PAIR: SpecificationVersionPair = ['3.0.0', '3.0.0']
+const DEFAULT_OPENAPI_VERSION_PAIR: SpecificationVersionPair = OPENAPI_DEFAULT_VERSION_PAIR
 
 // Non-OpenAPI suites currently do not participate in any version matrix.
 // Keep a stable stub for external contract (future-proofing).
@@ -45,12 +47,13 @@ const isKnownSchemaScopeCase = (suiteType: TestSpecType, suiteId: string, testId
 
 /**
  * Returns samples from either a stored suite or a rendered schema scope.
+ * Throws if samples cannot be resolved (unknown case or data integrity error).
  */
 const resolveSuiteSamples = (
   suiteType: TestSpecType,
   suiteId: string,
   testId: string,
-): [string, string] | null => {
+): [string, string] => {
   const caseKey = buildCaseKey(suiteType, suiteId, testId)
   const suite = CompatibilitySuiteMap.get(caseKey)
   if (suite) {
@@ -58,15 +61,15 @@ const resolveSuiteSamples = (
   }
 
   if (!isSchemaScope(suiteType, suiteId)) {
-    return null
+    throw new Error(`Unknown compatibility suite case: (${suiteType}, ${suiteId}, ${testId})`)
+  }
+
+  if (!JsonSchemaCaseMap.has(testId)) {
+    throw new Error(`Unknown JSON schema case '${testId}' for schema scope (${suiteType}, ${suiteId})`)
   }
 
   const before = composeSchemaCase(suiteType, suiteId, testId, 'before')
   const after = composeSchemaCase(suiteType, suiteId, testId, 'after')
-  if (!before && !after) {
-    return null
-  }
-
   return [before, after]
 }
 
@@ -115,18 +118,6 @@ const getMetadataVersionPairs = (
 }
 
 /**
- * Patches only the root "openapi:" line in an OpenAPI YAML string.
- * Throws if the root "openapi" field is missing.
- */
-const patchOpenApiVersion = (source: string, version: string): string => {
-  const pattern = /^openapi:\s*.*$/m
-  if (!pattern.test(source)) {
-    throw new Error('Invalid OpenAPI sample: missing root "openapi" field')
-  }
-  return source.replace(pattern, `openapi: ${version}`)
-}
-
-/**
  * Returns supported specification version pairs for a compatibility suite case.
  *
  * - OpenAPI:
@@ -152,6 +143,7 @@ export const getCompatibilitySuiteSpecificationVersionPairs = (
 
 /**
  * Returns before/after samples for a compatibility suite case.
+ * Throws if the case is unknown or samples cannot be resolved.
  *
  * - If specificationVersionPair is not provided: returns stored samples as-is.
  * - If specificationVersionPair is provided:
@@ -166,9 +158,6 @@ export const getCompatibilitySuite = (
   specificationVersionPair?: SpecificationVersionPair,
 ): [string, string] => {
   const suiteSamples = resolveSuiteSamples(suiteType, suiteId, testId)
-  if (!suiteSamples) {
-    return ['', '']
-  }
 
   if (specificationVersionPair === undefined) {
     return suiteSamples
@@ -214,26 +203,36 @@ export const getCompatibilitySuite = (
  * Returns a map: suiteId -> testIds[] (optionally filtered by specType).
  *
  * Note: enumeration-only; does not return samples/metadata.
+ * When specType is omitted, suiteId must be unique across suite types or later entries overwrite earlier ones.
  */
 export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, string[]> => {
-  const suites = [...CompatibilitySuiteMap.keys()].reduce((result, caseKey) => {
-    const [suiteType, suiteId, testId] = caseKey.split(CASE_KEY_SEPARATOR)
-    if (specType && specType !== suiteType) {
-      return result
+  const suites = new Map<string, string[]>()
+
+  const assertKnownSuiteType: (suiteType: string) => asserts suiteType is TestSpecType = (suiteType) => {
+    if (!isKnownSuiteType(suiteType)) {
+      throw new Error(`Unexpected suiteType in generated maps: ${suiteType}`)
     }
-    const testIds = result.get(suiteId)
-    result.set(suiteId, testIds ? [...testIds, testId] : [testId])
-    return result
-  }, new Map()) as Map<string, string[]>
+  }
+  const isIncludedSuiteType = (suiteType: TestSpecType): boolean => !specType || specType === suiteType
+
+  for (const caseKey of CompatibilitySuiteMap.keys()) {
+    const [suiteType, suiteId, testId] = caseKey.split(CASE_KEY_SEPARATOR)
+    assertKnownSuiteType(suiteType)
+    if (!isIncludedSuiteType(suiteType)) {
+      continue
+    }
+    const testIds = suites.get(suiteId)
+    suites.set(suiteId, testIds ? [...testIds, testId] : [testId])
+  }
 
   const schemaCaseIds = [...JsonSchemaCaseMap.keys()]
   for (const templateKey of SchemaScopeTemplateMap.keys()) {
-    const [suiteTypeRaw, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
-    const suiteType = suiteTypeRaw as TestSpecType
+    const [suiteType, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
+    assertKnownSuiteType(suiteType)
     if (!isSchemaScope(suiteType, suiteId)) {
       continue
     }
-    if (specType && specType !== suiteType) {
+    if (!isIncludedSuiteType(suiteType)) {
       continue
     }
     suites.set(suiteId, [...schemaCaseIds])

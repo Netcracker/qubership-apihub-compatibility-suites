@@ -4,14 +4,16 @@ import path from 'path'
 import { exit } from 'process'
 import { fileURLToPath } from 'url'
 
+import { isKnownSchemaScopeId } from '../src/schema/schema-scopes'
 import {
   buildCaseKey,
-  CASE_KEY_SEPARATOR,
+  buildTemplateKey,
+  isKnownSuiteType,
   TEST_SPEC_TYPE_ASYNC_API,
   TEST_SPEC_TYPE_GRAPH_QL,
   TEST_SPEC_TYPE_OPEN_API,
   type TestSpecType,
-} from '../src/suite-shared'
+} from '../src/shared/suite-shared'
 
 // Prevent running generators from an installed package in node_modules.
 // We only generate when executing from the repo workspace at: <PACKAGE_ROOT>/bin/*
@@ -41,12 +43,18 @@ const METADATA_FILE_NAME = 'metadata.yaml'
 
 const GENERATED_SUITE_DATA_PATH = path.join(PACKAGE_ROOT, 'generated', 'suite-data.ts')
 
-const VALID_OPENAPI_MAJOR_MINORS = ['3.0', '3.1'] as const
-
 type CompatibilitySuite = { before: string; after: string }
 type CompatibilitySuiteMeta = { versionPairs: [string, string][] }
 type SchemaFragments = { schema: string }
 type JsonSchemaCase = { before: SchemaFragments; after: SchemaFragments }
+
+const readTextFile = (filePath: string): string => readFileSync(filePath, 'utf-8')
+
+const assertFileExists = (filePath: string, errorMessage: string): void => {
+  if (!existsSync(filePath)) {
+    throw new Error(errorMessage)
+  }
+}
 
 const isUnknownArray = (value: unknown): value is unknown[] => Array.isArray(value)
 
@@ -72,7 +80,7 @@ const validateSpecificationVersionPairs = (
     if (suiteType === TEST_SPEC_TYPE_OPEN_API) {
       for (const version of [beforeVersion, afterVersion]) {
         const majorMinor = version.startsWith('3.0.') ? '3.0' : version.startsWith('3.1.') ? '3.1' : null
-        if (!majorMinor || !VALID_OPENAPI_MAJOR_MINORS.includes(majorMinor)) {
+        if (!majorMinor) {
           throw new Error(`Invalid metadata for case '${caseKey}': unsupported OpenAPI version '${version}'`)
         }
       }
@@ -88,16 +96,12 @@ const parseMetadata = (
   if (!existsSync(metadataPath)) {
     return null
   }
-  const content = readFileSync(metadataPath, 'utf-8')
+  const content = readTextFile(metadataPath)
   const metadata: unknown = loadYaml(content)
-  if (!metadata || typeof metadata !== 'object') {
-    return null
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    throw new Error(`Invalid metadata for case '${caseKey}': expected a YAML mapping/object`)
   }
-
   const versionCombinations = (metadata as Record<string, unknown>).version_combinations
-  if (versionCombinations === undefined) {
-    return null
-  }
 
   validateSpecificationVersionPairs(suiteType, versionCombinations, caseKey)
   return { versionPairs: versionCombinations as CompatibilitySuiteMeta['versionPairs'] }
@@ -109,107 +113,112 @@ const getDirectories = (basePath: string): string[] =>
     .map((dirent) => dirent.name)
     .sort()
 
-const buildSchemaTemplateKey = (suiteType: TestSpecType, suiteId: string): string =>
-  [suiteType, suiteId].join(CASE_KEY_SEPARATOR)
+const main = (): void => {
+  const suitesMap: Array<[string, CompatibilitySuite]> = []
+  const metaMap: Array<[string, CompatibilitySuiteMeta]> = []
+  const schemaCaseMap: Array<[string, JsonSchemaCase]> = []
+  const schemaCaseIds = new Set<string>()
+  const schemaScopeTemplateMap: Array<[string, string]> = []
+  const schemaScopeTemplateKeys = new Set<string>()
 
-const suitesMap: Array<[string, CompatibilitySuite]> = []
-const metaMap: Array<[string, CompatibilitySuiteMeta]> = []
-const schemaCaseMap: Array<[string, JsonSchemaCase]> = []
-const schemaScopeTemplateMap: Array<[string, string]> = []
-const schemaScopeTemplateKeys = new Set<string>()
-
-const isKnownSuiteType = (suiteTypeDir: string): suiteTypeDir is TestSpecType =>
-  suiteTypeDir === TEST_SPEC_TYPE_OPEN_API ||
-  suiteTypeDir === TEST_SPEC_TYPE_GRAPH_QL ||
-  suiteTypeDir === TEST_SPEC_TYPE_ASYNC_API
-
-if (existsSync(SCHEMA_BASE_STORE_DIR)) {
-  for (const caseId of getDirectories(SCHEMA_BASE_STORE_DIR)) {
-    const caseDir = path.join(SCHEMA_BASE_STORE_DIR, caseId)
-    const beforePath = path.join(caseDir, `before.${SCHEMA_FRAGMENT_FILE_EXT}`)
-    const afterPath = path.join(caseDir, `after.${SCHEMA_FRAGMENT_FILE_EXT}`)
-    if (!existsSync(beforePath) || !existsSync(afterPath)) {
-      throw new Error(`Missing JSON schema case fragment(s) for '${caseId}'`)
-    }
-    const before = readFileSync(beforePath, 'utf-8')
-    const after = readFileSync(afterPath, 'utf-8')
-    schemaCaseMap.push([caseId, { before: { schema: before }, after: { schema: after } }])
-  }
-}
-
-const suiteTypeDirs = getDirectories(COMPATIBILITY_SUITES_DIR).filter((suiteTypeDir) => suiteTypeDir !== 'schemas')
-
-for (const suiteTypeDir of suiteTypeDirs) {
-  if (!isKnownSuiteType(suiteTypeDir)) {
-    throw new Error(`Unknown suiteType directory: ${suiteTypeDir}`)
-  }
-  const suiteType: TestSpecType = suiteTypeDir
-  for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteType))) {
-    const templatePath = path.join(COMPATIBILITY_SUITES_DIR, suiteType, suiteId, SCHEMA_TEMPLATE_FILE_NAME)
-    if (existsSync(templatePath)) {
-      const templateKey = buildSchemaTemplateKey(suiteType, suiteId)
-      schemaScopeTemplateMap.push([templateKey, readFileSync(templatePath, 'utf-8')])
-      schemaScopeTemplateKeys.add(templateKey)
+  // Scan schema base store for reusable JSON Schema cases
+  if (existsSync(SCHEMA_BASE_STORE_DIR)) {
+    for (const caseId of getDirectories(SCHEMA_BASE_STORE_DIR)) {
+      const caseDir = path.join(SCHEMA_BASE_STORE_DIR, caseId)
+      const beforePath = path.join(caseDir, `before.${SCHEMA_FRAGMENT_FILE_EXT}`)
+      const afterPath = path.join(caseDir, `after.${SCHEMA_FRAGMENT_FILE_EXT}`)
+      const missingFragmentsError = `Missing JSON schema case fragment(s) for '${caseId}'`
+      assertFileExists(beforePath, missingFragmentsError)
+      assertFileExists(afterPath, missingFragmentsError)
+      const before = readTextFile(beforePath)
+      const after = readTextFile(afterPath)
+      schemaCaseIds.add(caseId)
+      schemaCaseMap.push([caseId, { before: { schema: before }, after: { schema: after } }])
     }
   }
-}
 
-for (const suiteTypeDir of suiteTypeDirs) {
-  if (!isKnownSuiteType(suiteTypeDir)) {
-    throw new Error(`Unknown suiteType directory: ${suiteTypeDir}`)
+  const suiteTypeDirs = getDirectories(COMPATIBILITY_SUITES_DIR).filter((dir) => dir !== 'schemas')
+
+  // First pass: collect schema-scope templates
+  for (const suiteTypeDir of suiteTypeDirs) {
+    if (!isKnownSuiteType(suiteTypeDir)) {
+      throw new Error(`Unknown suiteType directory: ${suiteTypeDir}`)
+    }
+    for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir))) {
+      const templatePath = path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir, suiteId, SCHEMA_TEMPLATE_FILE_NAME)
+      if (existsSync(templatePath)) {
+        if (!isKnownSchemaScopeId(suiteTypeDir, suiteId)) {
+          throw new Error(`Schema-scope template found in unknown scope: ${suiteTypeDir}/${suiteId}`)
+        }
+        const templateKey = buildTemplateKey(suiteTypeDir, suiteId)
+        schemaScopeTemplateMap.push([templateKey, readTextFile(templatePath)])
+        schemaScopeTemplateKeys.add(templateKey)
+      }
+    }
   }
-  const suiteType: TestSpecType = suiteTypeDir
-  const ext = getSampleFileExt(suiteType)
 
-  for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteType))) {
-    const templateKey = buildSchemaTemplateKey(suiteType, suiteId)
-    const isSchemaScope = schemaScopeTemplateKeys.has(templateKey)
+  // Second pass: collect suite samples and metadata
+  for (const suiteTypeDir of suiteTypeDirs) {
+    if (!isKnownSuiteType(suiteTypeDir)) {
+      throw new Error(`Unknown suiteType directory: ${suiteTypeDir}`)
+    }
+    const ext = getSampleFileExt(suiteTypeDir)
 
-    for (const testId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteType, suiteId))) {
-      const basePath = path.join(COMPATIBILITY_SUITES_DIR, suiteType, suiteId, testId)
-      const beforePath = path.join(basePath, `before.${ext}`)
-      const afterPath = path.join(basePath, `after.${ext}`)
-      const caseKey = buildCaseKey(suiteType, suiteId, testId)
+    for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir))) {
+      const templateKey = buildTemplateKey(suiteTypeDir, suiteId)
+      const isSchemaScope = schemaScopeTemplateKeys.has(templateKey)
 
-      const beforeExists = existsSync(beforePath)
-      const afterExists = existsSync(afterPath)
-      if (beforeExists !== afterExists) {
-        const missing: string[] = []
-        if (!beforeExists) missing.push(beforePath)
-        if (!afterExists) missing.push(afterPath)
-        throw new Error(`Missing compatibility suite sample(s) for '${caseKey}': ${missing.join(', ')}`)
-      }
-      if (beforeExists && afterExists) {
-        const before = readFileSync(beforePath, 'utf-8')
-        const after = readFileSync(afterPath, 'utf-8')
-        suitesMap.push([caseKey, { before, after }])
-      } else if (!isSchemaScope) {
-        throw new Error(`Missing compatibility suite sample(s) for '${caseKey}': ${beforePath}, ${afterPath}`)
-      }
+      for (const testId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir, suiteId))) {
+        const basePath = path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir, suiteId, testId)
+        const beforePath = path.join(basePath, `before.${ext}`)
+        const afterPath = path.join(basePath, `after.${ext}`)
+        const caseKey = buildCaseKey(suiteTypeDir, suiteId, testId)
 
-      // OpenAPI-only: GraphQL suites do not participate in OpenAPI version matrix.
-      if (suiteType === TEST_SPEC_TYPE_OPEN_API) {
-        const metadata = parseMetadata(path.join(basePath, METADATA_FILE_NAME), caseKey, suiteType)
-        if (metadata) {
-          metaMap.push([caseKey, metadata])
+        if (isSchemaScope && !schemaCaseIds.has(testId)) {
+          throw new Error(
+            `Schema-scope case '${caseKey}' is missing JSON schema fragments in base store: ${testId}`,
+          )
+        }
+
+        const beforeExists = existsSync(beforePath)
+        const afterExists = existsSync(afterPath)
+        if (beforeExists !== afterExists) {
+          const missing: string[] = []
+          if (!beforeExists) missing.push(beforePath)
+          if (!afterExists) missing.push(afterPath)
+          throw new Error(`Missing compatibility suite sample(s) for '${caseKey}': ${missing.join(', ')}`)
+        }
+        if (beforeExists && afterExists) {
+          const before = readTextFile(beforePath)
+          const after = readTextFile(afterPath)
+          suitesMap.push([caseKey, { before, after }])
+        } else if (!isSchemaScope) {
+          throw new Error(`Missing compatibility suite sample(s) for '${caseKey}': ${beforePath}, ${afterPath}`)
+        }
+
+        // OpenAPI-only: GraphQL suites do not participate in OpenAPI version matrix.
+        if (suiteTypeDir === TEST_SPEC_TYPE_OPEN_API) {
+          const metadata = parseMetadata(path.join(basePath, METADATA_FILE_NAME), caseKey, suiteTypeDir)
+          if (metadata) {
+            metaMap.push([caseKey, metadata])
+          }
         }
       }
     }
   }
-}
 
-// Stable output (avoid noisy diffs across filesystems/OS).
-suitesMap.sort((a, b) => a[0].localeCompare(b[0]))
-metaMap.sort((a, b) => a[0].localeCompare(b[0]))
-schemaCaseMap.sort((a, b) => a[0].localeCompare(b[0]))
-schemaScopeTemplateMap.sort((a, b) => a[0].localeCompare(b[0]))
+  // Stable output (avoid noisy diffs across filesystems/OS).
+  suitesMap.sort((a, b) => a[0].localeCompare(b[0]))
+  metaMap.sort((a, b) => a[0].localeCompare(b[0]))
+  schemaCaseMap.sort((a, b) => a[0].localeCompare(b[0]))
+  schemaScopeTemplateMap.sort((a, b) => a[0].localeCompare(b[0]))
 
-const suitesJson = JSON.stringify(suitesMap)
-const metaJson = JSON.stringify(metaMap)
-const schemaCasesJson = JSON.stringify(schemaCaseMap)
-const schemaTemplatesJson = JSON.stringify(schemaScopeTemplateMap)
+  const suitesJson = JSON.stringify(suitesMap)
+  const metaJson = JSON.stringify(metaMap)
+  const schemaCasesJson = JSON.stringify(schemaCaseMap)
+  const schemaTemplatesJson = JSON.stringify(schemaScopeTemplateMap)
 
-const out = `// @generated
+  const out = `// @generated
 // This file is auto-generated from bin/comparison-base-suite/**. Do not edit manually.
 
 type CompatibilitySuite = { before: string; after: string }
@@ -223,5 +232,8 @@ export const JsonSchemaCaseMap = new Map<string, JsonSchemaCase>(${schemaCasesJs
 export const SchemaScopeTemplateMap = new Map<string, string>(${schemaTemplatesJson})
 `
 
-mkdirSync(path.dirname(GENERATED_SUITE_DATA_PATH), { recursive: true })
-writeFileSync(GENERATED_SUITE_DATA_PATH, out)
+  mkdirSync(path.dirname(GENERATED_SUITE_DATA_PATH), { recursive: true })
+  writeFileSync(GENERATED_SUITE_DATA_PATH, out)
+}
+
+main()
