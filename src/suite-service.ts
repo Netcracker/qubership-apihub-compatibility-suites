@@ -10,12 +10,13 @@ import {
   buildCaseKey,
   CASE_KEY_SEPARATOR,
   isKnownSuiteType,
+  TEST_SPEC_TYPE_ASYNC_API,
   TEST_SPEC_TYPE_GRAPH_QL,
   TEST_SPEC_TYPE_OPEN_API,
   type TestSpecType,
 } from './shared/suite-shared'
 
-export { TEST_SPEC_TYPE_GRAPH_QL, TEST_SPEC_TYPE_OPEN_API }
+export { TEST_SPEC_TYPE_ASYNC_API, TEST_SPEC_TYPE_GRAPH_QL, TEST_SPEC_TYPE_OPEN_API }
 export type { TestSpecType }
 
 export type SpecificationVersion = string
@@ -23,6 +24,7 @@ export type SpecificationVersionPair = [SpecificationVersion, SpecificationVersi
 
 // Non-OpenAPI suites currently do not participate in any version matrix.
 // Keep stable stubs per spec type (future-proofing).
+const DEFAULT_ASYNC_API_VERSION_PAIR: SpecificationVersionPair = ['3.0.0', '3.0.0']
 const DEFAULT_GRAPH_QL_VERSION_PAIR: SpecificationVersionPair = ['unversioned', 'unversioned']
 
 type VersionPairPolicy = {
@@ -79,6 +81,9 @@ const VERSION_PAIR_POLICY_BY_SUITE_TYPE: Record<TestSpecType, VersionPairPolicy>
   },
   [TEST_SPEC_TYPE_GRAPH_QL]: {
     defaultPair: DEFAULT_GRAPH_QL_VERSION_PAIR,
+  },
+  [TEST_SPEC_TYPE_ASYNC_API]: {
+    defaultPair: DEFAULT_ASYNC_API_VERSION_PAIR,
   },
 }
 
