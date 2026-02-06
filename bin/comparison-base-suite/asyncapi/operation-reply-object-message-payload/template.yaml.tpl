@@ -16,7 +16,7 @@ channels:
         payload:
           __SCHEMA__
 operations:
-  op1:
+  operation1:
     action: receive
     channel:
       $ref: "#/channels/requestChannel"

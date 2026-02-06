@@ -16,12 +16,12 @@ channels:
         headers:
           type: object
           properties:
-            h1:
+            header1:
               __SCHEMA__
         payload:
           type: object
 operations:
-  op1:
+  operation1:
     action: receive
     channel:
       $ref: "#/channels/requestChannel"
