@@ -172,12 +172,6 @@ const main = (): void => {
         const afterPath = path.join(basePath, `after.${ext}`)
         const caseKey = buildCaseKey(suiteTypeDir, suiteId, testId)
 
-        if (isSchemaScope && !schemaCaseIds.has(testId)) {
-          throw new Error(
-            `Schema-scope case '${caseKey}' is missing JSON schema fragments in base store: ${testId}`,
-          )
-        }
-
         const beforeExists = existsSync(beforePath)
         const afterExists = existsSync(afterPath)
         if (beforeExists !== afterExists) {
@@ -186,6 +180,16 @@ const main = (): void => {
           if (!afterExists) missing.push(afterPath)
           throw new Error(`Missing compatibility suite sample(s) for '${caseKey}': ${missing.join(', ')}`)
         }
+
+        // Schema-scope cases are either:
+        // - rendered from base-store schema fragments (no full before/after samples on disk)
+        // - or full-sample exceptions (before/after exist on disk) that do not require base fragments
+        if (isSchemaScope && !beforeExists && !afterExists && !schemaCaseIds.has(testId)) {
+          throw new Error(
+            `Schema-scope case '${caseKey}' is missing JSON schema fragments in base store: ${testId}`,
+          )
+        }
+
         if (beforeExists && afterExists) {
           const before = readTextFile(beforePath)
           const after = readTextFile(afterPath)

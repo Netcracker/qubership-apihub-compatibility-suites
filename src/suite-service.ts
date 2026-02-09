@@ -211,6 +211,23 @@ export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, str
   }
   const isIncludedSuiteType = (suiteType: TestSpecType): boolean => !specType || specType === suiteType
 
+  const schemaCaseIds = [...JsonSchemaCaseMap.keys()]
+
+  // Schema-scope suites:
+  // - baseline is the JSON schema base store caseIds (rendered via templates)
+  // - full-sample exceptions (stored in CompatibilitySuiteMap) must be included as well
+  for (const templateKey of SchemaScopeTemplateMap.keys()) {
+    const [suiteType, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
+    assertKnownSuiteType(suiteType)
+    if (!isIncludedSuiteType(suiteType)) {
+      continue
+    }
+    suites.set(suiteId, [...schemaCaseIds])
+  }
+
+  // Add/merge all full-sample cases (including schema-scope exceptions).
+  // Full samples override rendered samples at runtime via resolveSuiteSamples() priority,
+  // but enumeration must include them so consumers/tests can see the full union.
   for (const caseKey of CompatibilitySuiteMap.keys()) {
     const [suiteType, suiteId, testId] = caseKey.split(CASE_KEY_SEPARATOR)
     assertKnownSuiteType(suiteType)
@@ -218,20 +235,19 @@ export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, str
       continue
     }
     const testIds = suites.get(suiteId)
-    suites.set(suiteId, testIds ? [...testIds, testId] : [testId])
+    if (!testIds) {
+      suites.set(suiteId, [testId])
+      continue
+    }
+    if (!testIds.includes(testId)) {
+      testIds.push(testId)
+    }
   }
 
-  const schemaCaseIds = [...JsonSchemaCaseMap.keys()]
-  for (const templateKey of SchemaScopeTemplateMap.keys()) {
-    const [suiteType, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
-    assertKnownSuiteType(suiteType)
-    if (!isSchemaScope(suiteType, suiteId)) {
-      continue
-    }
-    if (!isIncludedSuiteType(suiteType)) {
-      continue
-    }
-    suites.set(suiteId, [...schemaCaseIds])
+  // Keep enumeration stable and deterministic for consumers/tests.
+  for (const [suiteId, testIds] of suites.entries()) {
+    testIds.sort((a, b) => a.localeCompare(b))
+    suites.set(suiteId, testIds)
   }
 
   return suites
