@@ -1,2 +1,0 @@
-$ref: "#/components/schemas/Pet"
-description: schema description override

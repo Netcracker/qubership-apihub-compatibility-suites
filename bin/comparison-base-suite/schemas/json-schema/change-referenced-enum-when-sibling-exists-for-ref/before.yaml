@@ -1,4 +1,0 @@
-$ref: "#/components/schemas/Color"
-enum:
-  - black
-  - white

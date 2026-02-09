@@ -1,2 +1,0 @@
-$ref: "#/components/schemas/Color"
-maxLength: 10
