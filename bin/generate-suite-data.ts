@@ -5,6 +5,7 @@ import { exit } from 'process'
 import { fileURLToPath } from 'url'
 
 import { isKnownSchemaScopeId } from '../src/schema/schema-scopes'
+import { type SchemaFragments } from '../src/schema/template-render'
 import {
   buildCaseKey,
   buildTemplateKey,
@@ -24,7 +25,8 @@ if (PACKAGE_ROOT.split(path.sep).includes('node_modules')) {
 }
 
 const COMPATIBILITY_SUITES_DIR = path.join(PACKAGE_ROOT, 'bin', 'comparison-base-suite')
-const SCHEMA_BASE_STORE_DIR = path.join(COMPATIBILITY_SUITES_DIR, 'schemas', 'json-schema')
+const SCHEMA_DIR_NAME = 'schemas'
+const SCHEMA_BASE_STORE_DIR = path.join(COMPATIBILITY_SUITES_DIR, SCHEMA_DIR_NAME, 'json-schema')
 
 const DEFAULT_SPEC_SAMPLE_FILE_EXT = 'yaml'
 const GRAPHQL_SAMPLE_FILE_EXT = 'graphql'
@@ -41,9 +43,10 @@ const METADATA_FILE_NAME = 'metadata.yaml'
 
 const GENERATED_SUITE_DATA_PATH = path.join(PACKAGE_ROOT, 'generated', 'suite-data.ts')
 
+// These types (+ SchemaFragments from template-render.ts) are also emitted into generated/suite-data.ts.
+// Keep all copies in sync when changing.
 type CompatibilitySuite = { before: string; after: string }
 type CompatibilitySuiteMeta = { versionPairs: [string, string][] }
-type SchemaFragments = { schema: string }
 type JsonSchemaCase = { before: SchemaFragments; after: SchemaFragments }
 
 const readTextFile = (filePath: string): string => readFileSync(filePath, 'utf-8')
@@ -54,18 +57,16 @@ const assertFileExists = (filePath: string, errorMessage: string): void => {
   }
 }
 
-const isUnknownArray = (value: unknown): value is unknown[] => Array.isArray(value)
-
 const validateSpecificationVersionPairs = (
   suiteType: TestSpecType,
   versionPairs: unknown,
   caseKey: string,
 ): void => {
-  if (!isUnknownArray(versionPairs) || versionPairs.length === 0) {
+  if (!Array.isArray(versionPairs) || versionPairs.length === 0) {
     throw new Error(`Invalid metadata for case '${caseKey}': version_combinations must be a non-empty array`)
   }
   for (const pair of versionPairs) {
-    if (!isUnknownArray(pair) || pair.length !== 2) {
+    if (!Array.isArray(pair) || pair.length !== 2) {
       throw new Error(`Invalid metadata for case '${caseKey}': each version pair must be a 2-item array`)
     }
 
@@ -135,13 +136,18 @@ const main = (): void => {
     }
   }
 
-  const suiteTypeDirs = getDirectories(COMPATIBILITY_SUITES_DIR).filter((dir) => dir !== 'schemas')
+  const suiteTypeDirs = getDirectories(COMPATIBILITY_SUITES_DIR).filter((dir) => dir !== SCHEMA_DIR_NAME)
+
+  // Validate all suite-type directories upfront (narrows string -> TestSpecType).
+  const validatedSuiteTypes = suiteTypeDirs.map((dir): TestSpecType => {
+    if (!isKnownSuiteType(dir)) {
+      throw new Error(`Unknown suiteType directory: ${dir}`)
+    }
+    return dir
+  })
 
   // First pass: collect schema-scope templates
-  for (const suiteTypeDir of suiteTypeDirs) {
-    if (!isKnownSuiteType(suiteTypeDir)) {
-      throw new Error(`Unknown suiteType directory: ${suiteTypeDir}`)
-    }
+  for (const suiteTypeDir of validatedSuiteTypes) {
     for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir))) {
       const templatePath = path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir, suiteId, SCHEMA_TEMPLATE_FILE_NAME)
       if (existsSync(templatePath)) {
@@ -156,10 +162,7 @@ const main = (): void => {
   }
 
   // Second pass: collect suite samples and metadata
-  for (const suiteTypeDir of suiteTypeDirs) {
-    if (!isKnownSuiteType(suiteTypeDir)) {
-      throw new Error(`Unknown suiteType directory: ${suiteTypeDir}`)
-    }
+  for (const suiteTypeDir of validatedSuiteTypes) {
     const ext = getSampleFileExt(suiteTypeDir)
 
     for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir))) {
@@ -175,10 +178,8 @@ const main = (): void => {
         const beforeExists = existsSync(beforePath)
         const afterExists = existsSync(afterPath)
         if (beforeExists !== afterExists) {
-          const missing: string[] = []
-          if (!beforeExists) missing.push(beforePath)
-          if (!afterExists) missing.push(afterPath)
-          throw new Error(`Missing compatibility suite sample(s) for '${caseKey}': ${missing.join(', ')}`)
+          const missing = !beforeExists ? beforePath : afterPath
+          throw new Error(`Mismatched compatibility suite samples for '${caseKey}': missing ${missing}`)
         }
 
         // Schema-scope cases are either:

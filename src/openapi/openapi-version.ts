@@ -1,4 +1,4 @@
-export const OPENAPI_DEFAULT_VERSION_PAIR: [string, string] = ['3.0.0', '3.0.0']
+export const DEFAULT_OPENAPI_VERSION_PAIR: [string, string] = ['3.0.0', '3.0.0']
 
 /**
  * Patches only the root "openapi:" line in an OpenAPI YAML string.

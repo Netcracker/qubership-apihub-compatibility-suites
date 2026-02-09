@@ -4,7 +4,7 @@ import {
   JsonSchemaCaseMap,
   SchemaScopeTemplateMap,
 } from '../generated/suite-data'
-import { OPENAPI_DEFAULT_VERSION_PAIR, patchOpenApiVersion } from './openapi/openapi-version'
+import { DEFAULT_OPENAPI_VERSION_PAIR, patchOpenApiVersion } from './openapi/openapi-version'
 import { composeSchemaCase, isSchemaScope } from './schema/schema-suites'
 import {
   buildCaseKey,
@@ -20,10 +20,6 @@ export type { TestSpecType }
 
 export type SpecificationVersion = string
 export type SpecificationVersionPair = [SpecificationVersion, SpecificationVersion]
-
-// Default OpenAPI version pair for cases without metadata.yaml.
-// Used only for enumeration/grouping (major.minor); such cases are canonical and never patched.
-const DEFAULT_OPENAPI_VERSION_PAIR: SpecificationVersionPair = OPENAPI_DEFAULT_VERSION_PAIR
 
 // Non-OpenAPI suites currently do not participate in any version matrix.
 // Keep stable stubs per spec type (future-proofing).
@@ -134,7 +130,7 @@ export const getCompatibilitySuiteSpecificationVersionPairs = (
 
   const versionPairPolicy = getVersionPairPolicy(suiteType)
   const metadataVersionPairs = getMetadataVersionPairs(suiteType, caseKey)
-  return metadataVersionPairs ? metadataVersionPairs : [versionPairPolicy.defaultPair]
+  return metadataVersionPairs ?? [versionPairPolicy.defaultPair]
 }
 
 /**
@@ -167,18 +163,17 @@ export const getCompatibilitySuite = (
     )
   }
 
+  const [beforeVersion, afterVersion] = specificationVersionPair
   const supportedPairs = getCompatibilitySuiteSpecificationVersionPairs(suiteType, suiteId, testId)
 
   // Guard against passing an arbitrary version pair:
   // allow only pairs declared for the case (or the suite-type default stub when metadata is absent).
   const isSupported = supportedPairs.some(
-    (pair) => pair[0] === specificationVersionPair[0] && pair[1] === specificationVersionPair[1],
+    (pair) => pair[0] === beforeVersion && pair[1] === afterVersion,
   )
   if (!isSupported) {
     throw new Error(
-      `Unsupported specificationVersionPair [${specificationVersionPair[0]}, ${
-        specificationVersionPair[1]
-      }] for case (${suiteType}, ${suiteId}, ${testId})`,
+      `Unsupported specificationVersionPair [${beforeVersion}, ${afterVersion}] for case (${suiteType}, ${suiteId}, ${testId})`,
     )
   }
 
@@ -199,7 +194,8 @@ export const getCompatibilitySuite = (
  * Returns a map: suiteId -> testIds[] (optionally filtered by specType).
  *
  * Note: enumeration-only; does not return samples/metadata.
- * When specType is omitted, suiteId must be unique across suite types or later entries overwrite earlier ones.
+ * When specType is omitted, suiteIds must be unique across suite types;
+ * colliding schema-scope suites silently overwrite each other's base caseIds.
  */
 export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, string[]> => {
   const suites = new Map<string, string[]>()
@@ -245,9 +241,9 @@ export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, str
   }
 
   // Keep enumeration stable and deterministic for consumers/tests.
-  for (const [suiteId, testIds] of suites.entries()) {
+  // .sort() mutates the array in place; the map already holds the same reference.
+  for (const [, testIds] of suites.entries()) {
     testIds.sort((a, b) => a.localeCompare(b))
-    suites.set(suiteId, testIds)
   }
 
   return suites
