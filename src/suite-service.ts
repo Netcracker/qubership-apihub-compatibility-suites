@@ -139,7 +139,7 @@ export const getCompatibilitySuiteSpecificationVersionPairs = (
  *
  * - If specificationVersionPair is not provided: returns stored samples as-is.
  * - If specificationVersionPair is provided:
- *   - suite types without a version-pair patch strategy: throws (currently OpenAPI-only).
+ *   - suite types without a version-pair patch strategy (GraphQL): returns raw samples as-is.
  *   - case without metadata.yaml: returns stored samples as-is (canonical; no patching).
  *   - case with metadata.yaml: patches samples according to the provided pair and returns patched strings.
  */
@@ -157,12 +157,6 @@ export const getCompatibilitySuite = (
 
   const versionPairPolicy = getVersionPairPolicy(suiteType)
 
-  if (!versionPairPolicy.patchSamples) {
-    throw new Error(
-      `specificationVersionPair is currently supported only for OpenAPI cases: (${suiteType}, ${suiteId}, ${testId})`,
-    )
-  }
-
   const [beforeVersion, afterVersion] = specificationVersionPair
   const supportedPairs = getCompatibilitySuiteSpecificationVersionPairs(suiteType, suiteId, testId)
 
@@ -175,6 +169,11 @@ export const getCompatibilitySuite = (
     throw new Error(
       `Unsupported specificationVersionPair [${beforeVersion}, ${afterVersion}] for case (${suiteType}, ${suiteId}, ${testId})`,
     )
+  }
+
+  // Suite types without a patch strategy (GraphQL) return raw samples as-is.
+  if (!versionPairPolicy.patchSamples) {
+    return suiteSamples
   }
 
   // Patching semantics:
