@@ -2,10 +2,10 @@ import {
   CompatibilitySuiteMap,
   CompatibilitySuiteMetaMap,
   JsonSchemaCaseMap,
-  SchemaScopeTemplateMap,
+  SchemaSuiteTemplateMap,
 } from '../generated/suite-data'
 import { DEFAULT_OPENAPI_VERSION_PAIR, patchOpenApiVersion } from './openapi/openapi-version'
-import { composeSchemaCase, isSchemaScope } from './schema/schema-suites'
+import { composeSchemaCase, isSchemaSuite } from './schemas/schema-suites'
 import {
   buildCaseKey,
   CASE_KEY_SEPARATOR,
@@ -14,7 +14,7 @@ import {
   TEST_SPEC_TYPE_GRAPH_QL,
   TEST_SPEC_TYPE_OPEN_API,
   type TestSpecType,
-} from './shared/suite-shared'
+} from './suite-types'
 
 export { TEST_SPEC_TYPE_ASYNC_API, TEST_SPEC_TYPE_GRAPH_QL, TEST_SPEC_TYPE_OPEN_API }
 export type { TestSpecType }
@@ -37,13 +37,13 @@ type VersionPairPolicy = {
 }
 
 /**
- * Returns true when a case is backed by a schema-scope template + base store.
+ * Returns true when a case is backed by a schema suite template + base store.
  */
-const isKnownSchemaScopeCase = (suiteType: TestSpecType, suiteId: string, testId: string): boolean =>
-  isSchemaScope(suiteType, suiteId) && JsonSchemaCaseMap.has(testId)
+const isKnownSchemaSuiteCase = (suiteType: TestSpecType, suiteId: string, testId: string): boolean =>
+  isSchemaSuite(suiteType, suiteId) && JsonSchemaCaseMap.has(testId)
 
 /**
- * Returns samples from either a stored suite or a rendered schema scope.
+ * Returns samples from either a stored suite or a rendered schema suite.
  * Throws if samples cannot be resolved (unknown case or data integrity error).
  */
 const resolveSuiteSamples = (
@@ -57,12 +57,12 @@ const resolveSuiteSamples = (
     return [suite.before, suite.after]
   }
 
-  if (!isSchemaScope(suiteType, suiteId)) {
+  if (!isSchemaSuite(suiteType, suiteId)) {
     throw new Error(`Unknown compatibility suite case: (${suiteType}, ${suiteId}, ${testId})`)
   }
 
   if (!JsonSchemaCaseMap.has(testId)) {
-    throw new Error(`Unknown JSON schema case '${testId}' for schema scope (${suiteType}, ${suiteId})`)
+    throw new Error(`Unknown JSON schema case '${testId}' for schema suite (${suiteType}, ${suiteId})`)
   }
 
   const before = composeSchemaCase(suiteType, suiteId, testId, 'before')
@@ -129,7 +129,7 @@ export const getCompatibilitySuiteSpecificationVersionPairs = (
 ): SpecificationVersionPair[] => {
   const caseKey = buildCaseKey(suiteType, suiteId, testId)
 
-  if (!CompatibilitySuiteMap.has(caseKey) && !isKnownSchemaScopeCase(suiteType, suiteId, testId)) {
+  if (!CompatibilitySuiteMap.has(caseKey) && !isKnownSchemaSuiteCase(suiteType, suiteId, testId)) {
     throw new Error(`Unknown compatibility suite case: (${suiteType}, ${suiteId}, ${testId})`)
   }
 
@@ -199,7 +199,7 @@ export const getCompatibilitySuite = (
  *
  * Note: enumeration-only; does not return samples/metadata.
  * When specType is omitted, suiteIds must be unique across suite types;
- * colliding schema-scope suites silently overwrite each other's base caseIds.
+ * colliding schema suites silently overwrite each other's base testIds.
  */
 export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, string[]> => {
   const suites = new Map<string, string[]>()
@@ -211,21 +211,21 @@ export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, str
   }
   const isIncludedSuiteType = (suiteType: TestSpecType): boolean => !specType || specType === suiteType
 
-  const schemaCaseIds = [...JsonSchemaCaseMap.keys()]
+  const schemaTestIds = [...JsonSchemaCaseMap.keys()]
 
-  // Schema-scope suites:
-  // - baseline is the JSON schema base store caseIds (rendered via templates)
+  // Schema suites:
+  // - baseline is the JSON schema base store testIds (rendered via templates)
   // - full-sample exceptions (stored in CompatibilitySuiteMap) must be included as well
-  for (const templateKey of SchemaScopeTemplateMap.keys()) {
+  for (const templateKey of SchemaSuiteTemplateMap.keys()) {
     const [suiteType, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
     assertKnownSuiteType(suiteType)
     if (!isIncludedSuiteType(suiteType)) {
       continue
     }
-    suites.set(suiteId, [...schemaCaseIds])
+    suites.set(suiteId, [...schemaTestIds])
   }
 
-  // Add/merge all full-sample cases (including schema-scope exceptions).
+  // Add/merge all full-sample cases (including schema suite exceptions).
   // Full samples override rendered samples at runtime via resolveSuiteSamples() priority,
   // but enumeration must include them so consumers/tests can see the full union.
   for (const caseKey of CompatibilitySuiteMap.keys()) {

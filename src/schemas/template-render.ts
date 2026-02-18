@@ -1,7 +1,7 @@
 const SCHEMA_PLACEHOLDER = '__SCHEMA__'
 
 /**
- * Schema fragments used by schema-scope templates.
+ * Schema fragments used by schema suite templates.
  */
 export type SchemaFragments = { schema: string }
 
@@ -65,7 +65,7 @@ const replaceSchemaPlaceholder = (template: string, fragment: string): string =>
 }
 
 /**
- * Renders a schema-scope template with the provided fragments.
+ * Renders a schema suite template with the provided fragments.
  * Throws if the template is missing or duplicates the schema placeholder.
  */
 export const renderTemplate = (template: string, fragments: SchemaFragments): string => {

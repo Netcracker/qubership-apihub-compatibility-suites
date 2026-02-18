@@ -4,8 +4,8 @@ import path from 'path'
 import { exit } from 'process'
 import { fileURLToPath } from 'url'
 
-import { isKnownSchemaScopeId } from '../src/schema/schema-scopes'
-import { type SchemaFragments } from '../src/schema/template-render'
+import { isKnownSchemaSuiteId } from '../src/schemas/schema-suite-ids'
+import { type SchemaFragments } from '../src/schemas/template-render'
 import {
   buildCaseKey,
   buildTemplateKey,
@@ -14,7 +14,7 @@ import {
   TEST_SPEC_TYPE_GRAPH_QL,
   TEST_SPEC_TYPE_OPEN_API,
   type TestSpecType,
-} from '../src/shared/suite-shared'
+} from '../src/suite-types'
 
 // Prevent running generators from an installed package in node_modules.
 // We only generate when executing from the repo workspace at: <PACKAGE_ROOT>/bin/*
@@ -118,23 +118,23 @@ const main = (): void => {
   const suitesMap: Array<[string, CompatibilitySuite]> = []
   const metaMap: Array<[string, CompatibilitySuiteMeta]> = []
   const schemaCaseMap: Array<[string, JsonSchemaCase]> = []
-  const schemaCaseIds = new Set<string>()
-  const schemaScopeTemplateMap: Array<[string, string]> = []
-  const schemaScopeTemplateKeys = new Set<string>()
+  const schemaTestIds = new Set<string>()
+  const schemaSuiteTemplateMap: Array<[string, string]> = []
+  const schemaSuiteTemplateKeys = new Set<string>()
 
   // Scan schema base store for reusable JSON Schema cases
   if (existsSync(SCHEMA_BASE_STORE_DIR)) {
-    for (const caseId of getDirectories(SCHEMA_BASE_STORE_DIR)) {
-      const caseDir = path.join(SCHEMA_BASE_STORE_DIR, caseId)
-      const beforePath = path.join(caseDir, `before.${SCHEMA_FRAGMENT_FILE_EXT}`)
-      const afterPath = path.join(caseDir, `after.${SCHEMA_FRAGMENT_FILE_EXT}`)
-      const missingFragmentsError = `Missing JSON schema case fragment(s) for '${caseId}'`
+    for (const testId of getDirectories(SCHEMA_BASE_STORE_DIR)) {
+      const testDir = path.join(SCHEMA_BASE_STORE_DIR, testId)
+      const beforePath = path.join(testDir, `before.${SCHEMA_FRAGMENT_FILE_EXT}`)
+      const afterPath = path.join(testDir, `after.${SCHEMA_FRAGMENT_FILE_EXT}`)
+      const missingFragmentsError = `Missing JSON schema case fragment(s) for '${testId}'`
       assertFileExists(beforePath, missingFragmentsError)
       assertFileExists(afterPath, missingFragmentsError)
       const before = readTextFile(beforePath)
       const after = readTextFile(afterPath)
-      schemaCaseIds.add(caseId)
-      schemaCaseMap.push([caseId, { before: { schema: before }, after: { schema: after } }])
+      schemaTestIds.add(testId)
+      schemaCaseMap.push([testId, { before: { schema: before }, after: { schema: after } }])
     }
   }
 
@@ -148,17 +148,17 @@ const main = (): void => {
     return dir
   })
 
-  // First pass: collect schema-scope templates
+  // First pass: collect schema suite templates
   for (const suiteTypeDir of validatedSuiteTypes) {
     for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir))) {
       const templatePath = path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir, suiteId, SCHEMA_TEMPLATE_FILE_NAME)
       if (existsSync(templatePath)) {
-        if (!isKnownSchemaScopeId(suiteTypeDir, suiteId)) {
-          throw new Error(`Schema-scope template found in unknown scope: ${suiteTypeDir}/${suiteId}`)
+        if (!isKnownSchemaSuiteId(suiteTypeDir, suiteId)) {
+          throw new Error(`Schema suite template found for unknown suiteId: ${suiteTypeDir}/${suiteId}`)
         }
         const templateKey = buildTemplateKey(suiteTypeDir, suiteId)
-        schemaScopeTemplateMap.push([templateKey, readTextFile(templatePath)])
-        schemaScopeTemplateKeys.add(templateKey)
+        schemaSuiteTemplateMap.push([templateKey, readTextFile(templatePath)])
+        schemaSuiteTemplateKeys.add(templateKey)
       }
     }
   }
@@ -169,7 +169,7 @@ const main = (): void => {
 
     for (const suiteId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir))) {
       const templateKey = buildTemplateKey(suiteTypeDir, suiteId)
-      const isSchemaScope = schemaScopeTemplateKeys.has(templateKey)
+      const isSchemaSuite = schemaSuiteTemplateKeys.has(templateKey)
 
       for (const testId of getDirectories(path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir, suiteId))) {
         const basePath = path.join(COMPATIBILITY_SUITES_DIR, suiteTypeDir, suiteId, testId)
@@ -184,12 +184,12 @@ const main = (): void => {
           throw new Error(`Mismatched compatibility suite samples for '${caseKey}': missing ${missing}`)
         }
 
-        // Schema-scope cases are either:
+        // Schema suite cases are either:
         // - rendered from base-store schema fragments (no full before/after samples on disk)
         // - or full-sample exceptions (before/after exist on disk) that do not require base fragments
-        if (isSchemaScope && !beforeExists && !afterExists && !schemaCaseIds.has(testId)) {
+        if (isSchemaSuite && !beforeExists && !afterExists && !schemaTestIds.has(testId)) {
           throw new Error(
-            `Schema-scope case '${caseKey}' is missing JSON schema fragments in base store: ${testId}`,
+            `Schema suite case '${caseKey}' is missing JSON schema fragments in base store: ${testId}`,
           )
         }
 
@@ -197,7 +197,7 @@ const main = (): void => {
           const before = readTextFile(beforePath)
           const after = readTextFile(afterPath)
           suitesMap.push([caseKey, { before, after }])
-        } else if (!isSchemaScope) {
+        } else if (!isSchemaSuite) {
           throw new Error(`Missing compatibility suite sample(s) for '${caseKey}': ${beforePath}, ${afterPath}`)
         }
 
@@ -216,12 +216,12 @@ const main = (): void => {
   suitesMap.sort((a, b) => a[0].localeCompare(b[0]))
   metaMap.sort((a, b) => a[0].localeCompare(b[0]))
   schemaCaseMap.sort((a, b) => a[0].localeCompare(b[0]))
-  schemaScopeTemplateMap.sort((a, b) => a[0].localeCompare(b[0]))
+  schemaSuiteTemplateMap.sort((a, b) => a[0].localeCompare(b[0]))
 
   const suitesJson = JSON.stringify(suitesMap)
   const metaJson = JSON.stringify(metaMap)
   const schemaCasesJson = JSON.stringify(schemaCaseMap)
-  const schemaTemplatesJson = JSON.stringify(schemaScopeTemplateMap)
+  const schemaTemplatesJson = JSON.stringify(schemaSuiteTemplateMap)
 
   const out = `// @generated
 // This file is auto-generated from bin/comparison-base-suite/**. Do not edit manually.
@@ -234,7 +234,7 @@ type JsonSchemaCase = { before: SchemaFragments; after: SchemaFragments }
 export const CompatibilitySuiteMap = new Map<string, CompatibilitySuite>(${suitesJson})
 export const CompatibilitySuiteMetaMap = new Map<string, CompatibilitySuiteMeta>(${metaJson})
 export const JsonSchemaCaseMap = new Map<string, JsonSchemaCase>(${schemaCasesJson})
-export const SchemaScopeTemplateMap = new Map<string, string>(${schemaTemplatesJson})
+export const SchemaSuiteTemplateMap = new Map<string, string>(${schemaTemplatesJson})
 `
 
   mkdirSync(path.dirname(GENERATED_SUITE_DATA_PATH), { recursive: true })

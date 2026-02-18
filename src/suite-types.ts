@@ -25,7 +25,7 @@ export const buildCaseKey = (suiteType: TestSpecType, suiteId: string, testId: s
   [suiteType, suiteId, testId].join(CASE_KEY_SEPARATOR)
 
 /**
- * Builds a stable logical template key for a schema-scope template.
+ * Builds a stable logical template key for a schema suite template.
  */
 export const buildTemplateKey = (suiteType: TestSpecType, suiteId: string): string =>
   [suiteType, suiteId].join(CASE_KEY_SEPARATOR)

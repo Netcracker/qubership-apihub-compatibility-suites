@@ -8,7 +8,7 @@ Contains cases for OpenAPI, GraphQL and AsyncAPI.
 
 ## Structure
 
-The cases path structure is `bin/comparison-base-suite/<apitype>/<case-suite>/<specific-case>`
+The cases path structure is `bin/comparison-base-suite/<suiteType>/<suiteId>/<testId>`
 Each case contains two specifications - `before` and `after` (or is rendered from a template, see below).
 
 Reflects one specific change (or may contain multiple variations of representing the same change).
@@ -22,16 +22,15 @@ OpenAPI cases may additionally contain `metadata.yaml` with a version matrix:
 
 ### Schema base store (JSON Schema fragments)
 
-Schema-scope suites reuse schema deltas from a base store:
+Schema suites reuse schema deltas from a base store:
 
-- `bin/comparison-base-suite/schemas/json-schema/<caseId>/{before.yaml,after.yaml}`
-- For schema scopes: `testId == caseId`
+- `bin/comparison-base-suite/schemas/json-schema/<testId>/{before.yaml,after.yaml}`
 
-### Schema scopes (template-rendered suites)
+### Schema suites (template-rendered suites)
 
-Schema-scope suites use templates rendered at runtime:
+Schema suites use templates rendered at runtime:
 
-- `bin/comparison-base-suite/<apitype>/<scopeSuiteId>/template.yaml.tpl`
+- `bin/comparison-base-suite/<apitype>/<suiteId>/template.yaml.tpl`
 - The template must include a **single** line-only `__SCHEMA__` placeholder.
 - If a full sample exists (`before/after`), it takes precedence over rendering (used for exceptions like `$ref` with `components:`).
 

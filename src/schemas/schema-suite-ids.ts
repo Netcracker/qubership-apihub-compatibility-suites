@@ -3,16 +3,16 @@ import {
   TEST_SPEC_TYPE_GRAPH_QL,
   TEST_SPEC_TYPE_OPEN_API,
   type TestSpecType,
-} from '../shared/suite-shared'
+} from '../suite-types'
 
-export const OPENAPI_SCHEMA_SCOPES = [
+const OPENAPI_SCHEMA_SUITE_IDS = [
   'parameters-schema',
   'request-body-schema',
   'response-body-schema',
   'response-headers-schema',
 ] as const
 
-export const ASYNCAPI_SCHEMA_SCOPES = [
+const ASYNCAPI_SCHEMA_SUITE_IDS = [
   'operation-receive-message-headers',
   'operation-send-message-headers',
   'operation-receive-message-payload',
@@ -23,11 +23,11 @@ export const ASYNCAPI_SCHEMA_SCOPES = [
   'operation-reply-send-message-payload',
 ] as const
 
-export const SCHEMA_SCOPES_BY_SPEC_TYPE: Record<TestSpecType, readonly string[]> = {
-  [TEST_SPEC_TYPE_OPEN_API]: OPENAPI_SCHEMA_SCOPES,
+const SCHEMA_SUITE_IDS_BY_SPEC_TYPE: Record<TestSpecType, readonly string[]> = {
+  [TEST_SPEC_TYPE_OPEN_API]: OPENAPI_SCHEMA_SUITE_IDS,
   [TEST_SPEC_TYPE_GRAPH_QL]: [],
-  [TEST_SPEC_TYPE_ASYNC_API]: ASYNCAPI_SCHEMA_SCOPES,
+  [TEST_SPEC_TYPE_ASYNC_API]: ASYNCAPI_SCHEMA_SUITE_IDS,
 }
 
-export const isKnownSchemaScopeId = (specType: TestSpecType, suiteId: string): boolean =>
-  SCHEMA_SCOPES_BY_SPEC_TYPE[specType].includes(suiteId)
+export const isKnownSchemaSuiteId = (specType: TestSpecType, suiteId: string): boolean =>
+  SCHEMA_SUITE_IDS_BY_SPEC_TYPE[specType].includes(suiteId)
