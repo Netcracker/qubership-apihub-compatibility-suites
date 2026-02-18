@@ -13,14 +13,14 @@ export const OPENAPI_SCHEMA_SCOPES = [
 ] as const
 
 export const ASYNCAPI_SCHEMA_SCOPES = [
-  'operation-message-headers-receive',
-  'operation-message-headers-send',
-  'operation-message-payload-receive',
-  'operation-message-payload-send',
-  'operation-reply-object-message-headers-receive',
-  'operation-reply-object-message-headers-send',
-  'operation-reply-object-message-payload-receive',
-  'operation-reply-object-message-payload-send',
+  'operation-receive-message-headers',
+  'operation-send-message-headers',
+  'operation-receive-message-payload',
+  'operation-send-message-payload',
+  'operation-reply-receive-message-headers',
+  'operation-reply-send-message-headers',
+  'operation-reply-receive-message-payload',
+  'operation-reply-send-message-payload',
 ] as const
 
 export const SCHEMA_SCOPES_BY_SPEC_TYPE: Record<TestSpecType, readonly string[]> = {
