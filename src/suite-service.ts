@@ -5,6 +5,7 @@ import {
   SchemaSuiteTemplateMap,
 } from '../generated/suite-data'
 import { DEFAULT_OPENAPI_VERSION_PAIR, patchOpenApiVersion } from './openapi/openapi-version'
+import { omitOpenApiOnlyTestIdsForNonOpenApi } from './schemas/schema-suite-ids'
 import { composeSchemaCase, isSchemaSuite } from './schemas/schema-suites'
 import {
   buildCaseKey,
@@ -211,18 +212,19 @@ export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, str
   }
   const isIncludedSuiteType = (suiteType: TestSpecType): boolean => !specType || specType === suiteType
 
-  const schemaTestIds = [...JsonSchemaCaseMap.keys()]
+  const allSchemaTestIds = [...JsonSchemaCaseMap.keys()]
 
   // Schema suites:
   // - baseline is the JSON schema base store testIds (rendered via templates)
   // - full-sample exceptions (stored in CompatibilitySuiteMap) must be included as well
+  // - OpenAPI-only test IDs are excluded for non-OpenAPI spec types
   for (const templateKey of SchemaSuiteTemplateMap.keys()) {
     const [suiteType, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
     assertKnownSuiteType(suiteType)
     if (!isIncludedSuiteType(suiteType)) {
       continue
     }
-    suites.set(suiteId, [...schemaTestIds])
+    suites.set(suiteId, omitOpenApiOnlyTestIdsForNonOpenApi(suiteType, allSchemaTestIds))
   }
 
   // Add/merge all full-sample cases (including schema suite exceptions).
