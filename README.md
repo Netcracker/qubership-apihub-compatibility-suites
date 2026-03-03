@@ -6,6 +6,19 @@ It is a collection of most important cases of changes in API for the purposes of
 
 Contains cases for OpenAPI, GraphQL and AsyncAPI.
 
+## Glossary
+
+| Term | Description |
+|---|---|
+| **suiteType** | Top-level API specification kind: `openapi`, `graphql`, or `asyncapi`. Maps 1:1 to a directory in `bin/comparison-base-suite/`. |
+| **suiteId** | The name of a test suite within a suiteType, e.g. `response-body-schema`, `request-body`, `root-type-general`. |
+| **testId** (caseId) | The name of an individual test case within a suite, e.g. `add-enum`, `remove-required-property`. |
+| **case** | A single pair of `before` + `after` API specifications that demonstrates one specific change (delta). Identified by `(suiteType, suiteId, testId)`. |
+| **caseKey** | A logical key built from `suiteType/suiteId/testId`, e.g. `openapi/response-body-schema/add-enum`. |
+| **schema suite** | A suite whose cases are rendered at runtime from a template + schema fragments (as opposed to stored full samples). |
+| **schema group** | A directory under `schemas/json-schema/` that groups schema fragments by portability. Current groups: `common`, `openapi`, `openapi-30`, `draft-07`. |
+| **schema group chain** | An ordered list of schema groups used to resolve which fragment to load. First match wins. Determined by suiteType and spec version. |
+
 ## Structure
 
 The cases path structure is `bin/comparison-base-suite/<suiteType>/<suiteId>/<testId>`
@@ -22,9 +35,11 @@ OpenAPI cases may additionally contain `metadata.yaml` with a version matrix:
 
 ### Schema base store (JSON Schema fragments)
 
-Schema suites reuse schema deltas from a base store:
+Schema suites reuse schema deltas from a base store, organized into schema group directories:
 
-- `bin/comparison-base-suite/schemas/json-schema/<testId>/{before.yaml,after.yaml}`
+- `bin/comparison-base-suite/schemas/json-schema/<schemaGroup>/<testId>/{before.yaml,after.yaml}`
+
+Schema groups: `common/` (portable across all spec types), `openapi/` (OpenAPI vocabulary), `openapi-30/` (OpenAPI 3.0 quirks), `draft-07/` (JSON Schema draft-07).
 
 ### Schema suites (template-rendered suites)
 

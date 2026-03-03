@@ -1,11 +1,18 @@
 import {
   CompatibilitySuiteMap,
   CompatibilitySuiteMetaMap,
-  JsonSchemaCaseMap,
   SchemaSuiteTemplateMap,
 } from '../generated/suite-data'
 import { DEFAULT_OPENAPI_VERSION_PAIR, patchOpenApiVersion } from './openapi/openapi-version'
-import { composeSchemaCase, isSchemaSuite } from './schemas/schema-suites'
+import { getSchemaGroupChain } from './schemas/schema-groups'
+import {
+  SCHEMA_VARIANT_AFTER,
+  SCHEMA_VARIANT_BEFORE,
+  composeSchemaCase,
+  getSchemaTestIdsForSuiteType,
+  isKnownSchemaSuiteCase,
+  isSchemaSuite,
+} from './schemas/schema-suites'
 import {
   buildCaseKey,
   CASE_KEY_SEPARATOR,
@@ -34,40 +41,6 @@ type VersionPairPolicy = {
     after: string,
     specificationVersionPair: SpecificationVersionPair,
   ) => [string, string]
-}
-
-/**
- * Returns true when a case is backed by a schema suite template + base store.
- */
-const isKnownSchemaSuiteCase = (suiteType: TestSpecType, suiteId: string, testId: string): boolean =>
-  isSchemaSuite(suiteType, suiteId) && JsonSchemaCaseMap.has(testId)
-
-/**
- * Returns samples from either a stored suite or a rendered schema suite.
- * Throws if samples cannot be resolved (unknown case or data integrity error).
- */
-const resolveSuiteSamples = (
-  suiteType: TestSpecType,
-  suiteId: string,
-  testId: string,
-): [string, string] => {
-  const caseKey = buildCaseKey(suiteType, suiteId, testId)
-  const suite = CompatibilitySuiteMap.get(caseKey)
-  if (suite) {
-    return [suite.before, suite.after]
-  }
-
-  if (!isSchemaSuite(suiteType, suiteId)) {
-    throw new Error(`Unknown compatibility suite case: (${suiteType}, ${suiteId}, ${testId})`)
-  }
-
-  if (!JsonSchemaCaseMap.has(testId)) {
-    throw new Error(`Unknown JSON schema case '${testId}' for schema suite (${suiteType}, ${suiteId})`)
-  }
-
-  const before = composeSchemaCase(suiteType, suiteId, testId, 'before')
-  const after = composeSchemaCase(suiteType, suiteId, testId, 'after')
-  return [before, after]
 }
 
 // Configuration per suiteType. Extend this map to support specificationVersionPair for new suite types.
@@ -100,9 +73,47 @@ const getVersionPairPolicy = (suiteType: TestSpecType): VersionPairPolicy => {
   return policy
 }
 
+const toMajorMinor = (version: string): string => {
+  const match = version.match(/^(\d+\.\d+)/)
+  return match ? match[1] : version
+}
+
 /**
- * Returns version pairs declared in metadata.yaml for the case, or undefined when metadata is absent.
- * Note: currently metadata-based version pairs are supported only for OpenAPI.
+ * Returns samples from either a stored suite or a rendered schema suite.
+ * For schema suites, uses per-side chain resolution based on the version pair.
+ */
+const resolveSuiteSamples = (
+  suiteType: TestSpecType,
+  suiteId: string,
+  testId: string,
+  specificationVersionPair?: SpecificationVersionPair,
+): [string, string] => {
+  const caseKey = buildCaseKey(suiteType, suiteId, testId)
+  const suite = CompatibilitySuiteMap.get(caseKey)
+  if (suite) {
+    return [suite.before, suite.after]
+  }
+
+  if (!isSchemaSuite(suiteType, suiteId)) {
+    throw new Error(`Unknown compatibility suite case: (${suiteType}, ${suiteId}, ${testId})`)
+  }
+
+  if (!getSchemaTestIdsForSuiteType(suiteType).has(testId)) {
+    throw new Error(`Unknown JSON schema case '${testId}' for schema suite (${suiteType}, ${suiteId})`)
+  }
+
+  const versionPair = specificationVersionPair ?? getVersionPairPolicy(suiteType).defaultPair
+  const beforeChain = getSchemaGroupChain(suiteType, toMajorMinor(versionPair[0]))
+  const afterChain = getSchemaGroupChain(suiteType, toMajorMinor(versionPair[1]))
+
+  const before = composeSchemaCase(suiteType, suiteId, testId, SCHEMA_VARIANT_BEFORE, beforeChain)
+  const after = composeSchemaCase(suiteType, suiteId, testId, SCHEMA_VARIANT_AFTER, afterChain)
+  return [before, after]
+}
+
+/**
+ * Returns metadata-based version pairs for a case, or undefined when absent.
+ * Currently metadata version pairs are supported only for OpenAPI.
  */
 const getMetadataVersionPairs = (
   suiteType: TestSpecType,
@@ -154,7 +165,7 @@ export const getCompatibilitySuite = (
   testId: string,
   specificationVersionPair?: SpecificationVersionPair,
 ): [string, string] => {
-  const suiteSamples = resolveSuiteSamples(suiteType, suiteId, testId)
+  const suiteSamples = resolveSuiteSamples(suiteType, suiteId, testId, specificationVersionPair)
 
   if (specificationVersionPair === undefined) {
     return suiteSamples
@@ -197,6 +208,10 @@ export const getCompatibilitySuite = (
  * Enumerates available compatibility suite cases.
  * Returns a map: suiteId -> testIds[] (optionally filtered by specType).
  *
+ * Schema suites are group-aware:
+ * - AsyncAPI schema suites see caseIds from {common, draft-07}
+ * - OpenAPI schema suites see caseIds from {common, openapi, openapi-30, draft-07}
+ *
  * Note: enumeration-only; does not return samples/metadata.
  * When specType is omitted, suiteIds must be unique across suite types;
  * colliding schema suites silently overwrite each other's base testIds.
@@ -211,18 +226,15 @@ export const getCompatibilitySuites = (specType?: TestSpecType): Map<string, str
   }
   const isIncludedSuiteType = (suiteType: TestSpecType): boolean => !specType || specType === suiteType
 
-  const schemaTestIds = [...JsonSchemaCaseMap.keys()]
-
-  // Schema suites:
-  // - baseline is the JSON schema base store testIds (rendered via templates)
-  // - full-sample exceptions (stored in CompatibilitySuiteMap) must be included as well
+  // Schema suites: baseline is the group-aware testIds for the suite type.
+  // Full-sample exceptions (stored in CompatibilitySuiteMap) are merged below.
   for (const templateKey of SchemaSuiteTemplateMap.keys()) {
     const [suiteType, suiteId] = templateKey.split(CASE_KEY_SEPARATOR)
     assertKnownSuiteType(suiteType)
     if (!isIncludedSuiteType(suiteType)) {
       continue
     }
-    suites.set(suiteId, [...schemaTestIds])
+    suites.set(suiteId, [...getSchemaTestIdsForSuiteType(suiteType)])
   }
 
   // Add/merge all full-sample cases (including schema suite exceptions).

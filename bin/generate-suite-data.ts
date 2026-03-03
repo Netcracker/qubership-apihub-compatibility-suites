@@ -4,6 +4,7 @@ import path from 'path'
 import { exit } from 'process'
 import { fileURLToPath } from 'url'
 
+import { isAllowedSchemaGroup } from '../src/schemas/schema-groups'
 import { isKnownSchemaSuiteId } from '../src/schemas/schema-suite-ids'
 import { type SchemaFragments } from '../src/schemas/template-render'
 import {
@@ -117,25 +118,37 @@ const getDirectories = (basePath: string): string[] =>
 const main = (): void => {
   const suitesMap: Array<[string, CompatibilitySuite]> = []
   const metaMap: Array<[string, CompatibilitySuiteMeta]> = []
-  const schemaCaseMap: Array<[string, JsonSchemaCase]> = []
-  const schemaTestIds = new Set<string>()
+  const schemaGroupCaseMap: Array<[string, JsonSchemaCase]> = []
+  const schemaGroupIndexMap: Array<[string, string[]]> = []
+  const allSchemaTestIds = new Set<string>()
   const schemaSuiteTemplateMap: Array<[string, string]> = []
   const schemaSuiteTemplateKeys = new Set<string>()
 
-  // Scan schema base store for reusable JSON Schema cases
-  if (existsSync(SCHEMA_BASE_STORE_DIR)) {
-    for (const testId of getDirectories(SCHEMA_BASE_STORE_DIR)) {
-      const testDir = path.join(SCHEMA_BASE_STORE_DIR, testId)
-      const beforePath = path.join(testDir, `before.${SCHEMA_FRAGMENT_FILE_EXT}`)
-      const afterPath = path.join(testDir, `after.${SCHEMA_FRAGMENT_FILE_EXT}`)
-      const missingFragmentsError = `Missing JSON schema case fragment(s) for '${testId}'`
-      assertFileExists(beforePath, missingFragmentsError)
-      assertFileExists(afterPath, missingFragmentsError)
-      const before = readTextFile(beforePath)
-      const after = readTextFile(afterPath)
-      schemaTestIds.add(testId)
-      schemaCaseMap.push([testId, { before: { schema: before }, after: { schema: after } }])
-    }
+  // Scan schema base store group directories for reusable JSON Schema cases
+  for (const group of getDirectories(SCHEMA_BASE_STORE_DIR)) {
+      if (!isAllowedSchemaGroup(group)) {
+        throw new Error(`Unknown schema group directory: ${group}`)
+      }
+      const groupDir = path.join(SCHEMA_BASE_STORE_DIR, group)
+      const caseIds: string[] = []
+
+      for (const caseId of getDirectories(groupDir)) {
+        const caseDir = path.join(groupDir, caseId)
+        const beforePath = path.join(caseDir, `before.${SCHEMA_FRAGMENT_FILE_EXT}`)
+        const afterPath = path.join(caseDir, `after.${SCHEMA_FRAGMENT_FILE_EXT}`)
+        const missingFragmentsError = `Missing JSON schema case fragment(s) for '${group}/${caseId}'`
+        assertFileExists(beforePath, missingFragmentsError)
+        assertFileExists(afterPath, missingFragmentsError)
+        const before = readTextFile(beforePath)
+        const after = readTextFile(afterPath)
+        const mapKey = `${group}/${caseId}`
+        schemaGroupCaseMap.push([mapKey, { before: { schema: before }, after: { schema: after } }])
+        caseIds.push(caseId)
+        allSchemaTestIds.add(caseId)
+      }
+
+      caseIds.sort((a, b) => a.localeCompare(b))
+    schemaGroupIndexMap.push([group, caseIds])
   }
 
   const suiteTypeDirs = getDirectories(COMPATIBILITY_SUITES_DIR).filter((dir) => dir !== SCHEMA_DIR_NAME)
@@ -187,7 +200,7 @@ const main = (): void => {
         // Schema suite cases are either:
         // - rendered from base-store schema fragments (no full before/after samples on disk)
         // - or full-sample exceptions (before/after exist on disk) that do not require base fragments
-        if (isSchemaSuite && !beforeExists && !afterExists && !schemaTestIds.has(testId)) {
+        if (isSchemaSuite && !beforeExists && !afterExists && !allSchemaTestIds.has(testId)) {
           throw new Error(
             `Schema suite case '${caseKey}' is missing JSON schema fragments in base store: ${testId}`,
           )
@@ -215,12 +228,14 @@ const main = (): void => {
   // Stable output (avoid noisy diffs across filesystems/OS).
   suitesMap.sort((a, b) => a[0].localeCompare(b[0]))
   metaMap.sort((a, b) => a[0].localeCompare(b[0]))
-  schemaCaseMap.sort((a, b) => a[0].localeCompare(b[0]))
+  schemaGroupCaseMap.sort((a, b) => a[0].localeCompare(b[0]))
+  schemaGroupIndexMap.sort((a, b) => a[0].localeCompare(b[0]))
   schemaSuiteTemplateMap.sort((a, b) => a[0].localeCompare(b[0]))
 
   const suitesJson = JSON.stringify(suitesMap)
   const metaJson = JSON.stringify(metaMap)
-  const schemaCasesJson = JSON.stringify(schemaCaseMap)
+  const schemaGroupCasesJson = JSON.stringify(schemaGroupCaseMap)
+  const schemaGroupIndexJson = JSON.stringify(schemaGroupIndexMap)
   const schemaTemplatesJson = JSON.stringify(schemaSuiteTemplateMap)
 
   const out = `// @generated
@@ -233,7 +248,8 @@ type JsonSchemaCase = { before: SchemaFragments; after: SchemaFragments }
 
 export const CompatibilitySuiteMap = new Map<string, CompatibilitySuite>(${suitesJson})
 export const CompatibilitySuiteMetaMap = new Map<string, CompatibilitySuiteMeta>(${metaJson})
-export const JsonSchemaCaseMap = new Map<string, JsonSchemaCase>(${schemaCasesJson})
+export const JsonSchemaGroupCaseMap = new Map<string, JsonSchemaCase>(${schemaGroupCasesJson})
+export const JsonSchemaGroupIndexMap = new Map<string, string[]>(${schemaGroupIndexJson})
 export const SchemaSuiteTemplateMap = new Map<string, string>(${schemaTemplatesJson})
 `
 
