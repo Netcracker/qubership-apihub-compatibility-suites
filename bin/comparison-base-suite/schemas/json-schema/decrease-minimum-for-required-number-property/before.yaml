@@ -1,0 +1,7 @@
+type: object
+required:
+  - prop1
+properties:
+  prop1:
+    type: number
+    minimum: 5
