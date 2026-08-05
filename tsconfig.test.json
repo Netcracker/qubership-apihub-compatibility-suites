@@ -1,0 +1,21 @@
+{
+  // The package ships ESM, but jest's default runtime consumes CommonJS, so ts-jest compiles the
+  // tests down. `verbatimModuleSyntax` has to be off for that: it forbids ESM syntax in a file
+  // being emitted as CommonJS. Kept separate so the build config stays exactly as it is.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "verbatimModuleSyntax": false,
+    "noEmit": true,
+    "types": ["node", "jest"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
