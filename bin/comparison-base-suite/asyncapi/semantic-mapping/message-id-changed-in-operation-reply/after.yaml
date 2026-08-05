@@ -1,0 +1,78 @@
+asyncapi: 3.0.0
+info:
+  title: Order Service AsyncAPI Specification
+  version: 1.0.0
+  description: AsyncAPI specification of Kafka consumers and producers
+operations:
+  sendOrderCommand_1001:
+    action: send
+    channel:
+      $ref: '#/channels/orderCommands_1001'
+    title: orderCommands_1001 send
+    description: Publish priority order commands to order-commands
+    messages:
+      - $ref: '#/channels/orderCommands_1001/messages/OrderCommand_1001'
+    reply:
+      channel:
+        $ref: '#/channels/orderReplies'
+      messages:
+        - $ref: '#/channels/orderReplies/messages/OrderEvent_2002'
+servers:
+  kafka-server:
+    host: /
+    protocol: kafka
+    description: Kafka Broker managed by MaaS
+    tags:
+      - name: maas
+components:
+  schemas:
+    OrderCommand:
+      title: OrderCommand
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        commandId:
+          type: string
+          description: Unique command identifier
+      description: Kafka payload for order commands
+    OrderEvent:
+      title: OrderEvent
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        eventId:
+          type: string
+          description: Unique event identifier
+      description: Kafka payload for order events
+  messages:
+    OrderCommand_1001:
+      payload:
+        $ref: '#/components/schemas/OrderCommand'
+      name: OrderCommand
+      title: OrderCommand
+      description: Command requesting a priority order change
+    OrderEvent_2002:
+      payload:
+        $ref: '#/components/schemas/OrderEvent'
+      name: OrderEvent
+      title: OrderEvent
+      description: Event representing priority order changes
+channels:
+  orderCommands_1001:
+    address: order-commands
+    title: order-commands
+    description: Kafka topic for priority order commands
+    servers:
+      - $ref: '#/servers/kafka-server'
+    messages:
+      OrderCommand_1001:
+        $ref: '#/components/messages/OrderCommand_1001'
+  orderReplies:
+    address: order-replies
+    title: order-replies
+    description: Kafka topic for order command replies
+    servers:
+      - $ref: '#/servers/kafka-server'
+    messages:
+      OrderEvent_2002:
+        $ref: '#/components/messages/OrderEvent_2002'

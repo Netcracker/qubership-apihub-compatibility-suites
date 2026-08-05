@@ -1,0 +1,88 @@
+asyncapi: 3.0.0
+info:
+  title: Order Service AsyncAPI Specification
+  version: 1.0.0
+  description: AsyncAPI specification of Kafka consumers and producers
+operations:
+  sendOrderEvent_1001:
+    action: send
+    channel:
+      $ref: '#/channels/orderEvents_1001'
+    title: orderEvents_1001 send
+    description: Publish priority order events to order-events
+    messages:
+      - $ref: '#/channels/orderEvents_1001/messages/OrderEventPriority'
+  sendOrderEvent:
+    action: send
+    channel:
+      $ref: '#/channels/orderEvents'
+    title: orderEvents send
+    description: Publish order events to order-events
+    messages:
+      - $ref: '#/channels/orderEvents/messages/OrderEvent'
+servers:
+  kafka-server:
+    host: /
+    protocol: kafka
+    description: Kafka Broker managed by MaaS
+    tags:
+      - name: maas
+components:
+  schemas:
+    TenantHeader:
+      type: string
+      title: Tenant
+      description: Tenant identifier
+    RequestIdHeader:
+      type: string
+      title: Request-Id
+      description: Request key for duplicate message detection
+    OrderEvent:
+      title: OrderEvent
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        eventId:
+          type: string
+          description: Unique event identifier
+      description: Kafka payload for order events
+  messages:
+    OrderEvent:
+      headers:
+        anyOf:
+          - $ref: '#/components/schemas/TenantHeader'
+          - $ref: '#/components/schemas/RequestIdHeader'
+      payload:
+        $ref: '#/components/schemas/OrderEvent'
+      name: OrderEvent
+      title: OrderEvent
+      description: Event representing order changes
+    OrderEventPriority:
+      headers:
+        anyOf:
+          - $ref: '#/components/schemas/TenantHeader'
+          - $ref: '#/components/schemas/RequestIdHeader'
+      payload:
+        $ref: '#/components/schemas/OrderEvent'
+      name: OrderEvent
+      title: OrderEvent
+      description: Event representing priority order changes
+channels:
+  orderEvents:
+    address: order-events
+    title: order-events
+    description: Kafka topic for order events
+    servers:
+      - $ref: '#/servers/kafka-server'
+    messages:
+      OrderEvent:
+        $ref: '#/components/messages/OrderEvent'
+  orderEvents_1001:
+    address: order-events
+    title: order-events
+    description: Kafka topic for priority order events
+    servers:
+      - $ref: '#/servers/kafka-server'
+    messages:
+      OrderEventPriority:
+        $ref: '#/components/messages/OrderEventPriority'
