@@ -11,8 +11,8 @@ operations:
     title: orderEvents send
     description: Publish order events to order-events
     messages:
-      - $ref: '#/channels/orderEvents/messages/OrderEventAlpha_9001'
-      - $ref: '#/channels/orderEvents/messages/OrderEventBeta_2002'
+      - $ref: '#/channels/orderEvents/messages/OrderEvent_9001'
+      - $ref: '#/channels/orderEvents/messages/OrderEvent_3003'
 servers:
   kafka-server:
     host: /
@@ -32,13 +32,13 @@ components:
           description: Unique event identifier
       description: Kafka payload for order events
   messages:
-    OrderEventAlpha_9001:
+    OrderEvent_9001:
       payload:
         $ref: '#/components/schemas/OrderEvent'
       name: OrderEvent
       title: OrderEvent
       description: Event representing alpha order changes
-    OrderEventBeta_2002:
+    OrderEvent_3003:
       payload:
         $ref: '#/components/schemas/OrderEvent'
       name: OrderEvent
@@ -52,7 +52,7 @@ channels:
     servers:
       - $ref: '#/servers/kafka-server'
     messages:
-      OrderEventAlpha_9001:
-        $ref: '#/components/messages/OrderEventAlpha_9001'
-      OrderEventBeta_2002:
-        $ref: '#/components/messages/OrderEventBeta_2002'
+      OrderEvent_9001:
+        $ref: '#/components/messages/OrderEvent_9001'
+      OrderEvent_3003:
+        $ref: '#/components/messages/OrderEvent_3003'
