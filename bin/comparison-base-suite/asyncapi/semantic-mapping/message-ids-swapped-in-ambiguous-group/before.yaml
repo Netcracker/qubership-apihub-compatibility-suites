@@ -1,0 +1,58 @@
+asyncapi: 3.0.0
+info:
+  title: Order Service AsyncAPI Specification
+  version: 1.0.0
+  description: AsyncAPI specification of Kafka consumers and producers
+operations:
+  sendOrderEvent:
+    action: send
+    channel:
+      $ref: '#/channels/orderEvents'
+    title: orderEvents send
+    description: Publish order events to order-events
+    messages:
+      - $ref: '#/channels/orderEvents/messages/OrderEventAlpha_1001'
+      - $ref: '#/channels/orderEvents/messages/OrderEventBeta_1002'
+servers:
+  kafka-server:
+    host: /
+    protocol: kafka
+    description: Kafka Broker managed by MaaS
+    tags:
+      - name: maas
+components:
+  schemas:
+    OrderEvent:
+      title: OrderEvent
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      properties:
+        eventId:
+          type: string
+          description: Unique event identifier
+      description: Kafka payload for order events
+  messages:
+    OrderEventAlpha_1001:
+      payload:
+        $ref: '#/components/schemas/OrderEvent'
+      name: OrderEvent
+      title: OrderEvent
+      description: Event representing alpha order changes
+    OrderEventBeta_1002:
+      payload:
+        $ref: '#/components/schemas/OrderEvent'
+      name: OrderEvent
+      title: OrderEvent
+      description: Event representing beta order changes
+channels:
+  orderEvents:
+    address: order-events
+    title: order-events
+    description: Kafka topic for order events
+    servers:
+      - $ref: '#/servers/kafka-server'
+    messages:
+      OrderEventAlpha_1001:
+        $ref: '#/components/messages/OrderEventAlpha_1001'
+      OrderEventBeta_1002:
+        $ref: '#/components/messages/OrderEventBeta_1002'
