@@ -1,1 +1,1 @@
-CREATE TABLE users(id int, email text, constraint pk_users primary key(email));
+CREATE TABLE users(id INT, email TEXT, CONSTRAINT pk_users PRIMARY KEY(email));

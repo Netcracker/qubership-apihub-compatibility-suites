@@ -1,7 +1,7 @@
 CREATE TABLE a (
-  id INT
+    id INT
 );
 
 CREATE TABLE b (
-  id INT
+    id INT
 );

@@ -1,3 +1,3 @@
 CREATE TABLE t (
-  v VARCHAR(200)
+    v VARCHAR(200)
 );

@@ -1,3 +1,3 @@
 CREATE TABLE t (
-  v UUID
+    v UUID
 );

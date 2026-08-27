@@ -1,4 +1,4 @@
 CREATE TABLE users (
-  id INT,
-  phone TEXT
+    id INT,
+    phone TEXT
 );

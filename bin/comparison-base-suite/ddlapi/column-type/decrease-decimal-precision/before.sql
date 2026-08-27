@@ -1,3 +1,3 @@
 CREATE TABLE t (
-  v NUMERIC(15, 2)
+    v NUMERIC(15, 2)
 );

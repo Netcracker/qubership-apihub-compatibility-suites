@@ -1,3 +1,3 @@
 CREATE TABLE users (
-  id INT
+    id INT
 );

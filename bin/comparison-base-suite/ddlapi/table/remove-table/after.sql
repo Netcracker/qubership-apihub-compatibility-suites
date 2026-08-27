@@ -1,3 +1,3 @@
 CREATE TABLE a (
-  id INT
+    id INT
 );

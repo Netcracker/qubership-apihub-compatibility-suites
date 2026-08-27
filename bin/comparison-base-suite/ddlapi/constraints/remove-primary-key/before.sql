@@ -1,1 +1,1 @@
-CREATE TABLE users(id int primary key, email text);
+CREATE TABLE users(id INT PRIMARY KEY, email TEXT);

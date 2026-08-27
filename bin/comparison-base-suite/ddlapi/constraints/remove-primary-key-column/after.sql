@@ -1,1 +1,1 @@
-CREATE TABLE users(id int, tenant_id int, constraint pk_users primary key(id));
+CREATE TABLE users(id INT, tenant_id INT, CONSTRAINT pk_users PRIMARY KEY(id));

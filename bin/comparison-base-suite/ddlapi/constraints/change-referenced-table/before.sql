@@ -1,1 +1,1 @@
-CREATE TABLE legacy(id int primary key); CREATE TABLE target(id int primary key); CREATE TABLE u(ref int references legacy(id));
+CREATE TABLE legacy(id INT PRIMARY KEY); CREATE TABLE target(id INT PRIMARY KEY); CREATE TABLE u(ref INT REFERENCES legacy(id));

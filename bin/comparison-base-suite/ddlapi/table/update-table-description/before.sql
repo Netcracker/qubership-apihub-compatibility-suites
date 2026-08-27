@@ -1,5 +1,5 @@
 CREATE TABLE t (
-  id INT
+    id INT
 );
 
 COMMENT ON TABLE t IS 'old';
