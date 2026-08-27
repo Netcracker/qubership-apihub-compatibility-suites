@@ -1,1 +1,7 @@
-CREATE TABLE t(id INT PRIMARY KEY); CREATE TABLE u(ref INT);
+CREATE TABLE t (
+    id INT PRIMARY KEY
+);
+
+CREATE TABLE u (
+    ref INT
+);

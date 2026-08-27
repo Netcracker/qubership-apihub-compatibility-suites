@@ -1,1 +1,4 @@
-CREATE TABLE users(id INT, email TEXT);
+CREATE TABLE users (
+    id INT,
+    email TEXT
+);

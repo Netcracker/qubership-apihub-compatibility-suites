@@ -1,1 +1,9 @@
-CREATE TABLE parent(id INT PRIMARY KEY); CREATE TABLE child(a INT, b INT, FOREIGN KEY(a) REFERENCES parent(id));
+CREATE TABLE parent (
+    id INT PRIMARY KEY
+);
+
+CREATE TABLE child (
+    a INT,
+    b INT,
+    FOREIGN KEY(a) REFERENCES parent(id)
+);

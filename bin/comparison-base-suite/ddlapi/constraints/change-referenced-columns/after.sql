@@ -1,1 +1,9 @@
-CREATE TABLE t(id INT, code INT, PRIMARY KEY(id,code)); CREATE TABLE u(ref INT REFERENCES t(code));
+CREATE TABLE t (
+    id INT,
+    code INT,
+    PRIMARY KEY(id,code)
+);
+
+CREATE TABLE u (
+    ref INT REFERENCES t(code)
+);

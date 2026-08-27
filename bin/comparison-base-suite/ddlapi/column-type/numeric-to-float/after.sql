@@ -1,1 +1,3 @@
-CREATE TABLE t (v REAL);
+CREATE TABLE t (
+    v REAL
+);

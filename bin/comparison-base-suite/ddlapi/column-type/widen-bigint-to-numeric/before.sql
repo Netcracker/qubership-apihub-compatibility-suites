@@ -1,1 +1,3 @@
-CREATE TABLE t (v BIGINT);
+CREATE TABLE t (
+    v BIGINT
+);

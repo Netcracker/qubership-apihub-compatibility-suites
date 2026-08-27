@@ -1,1 +1,3 @@
-CREATE TABLE t (v TEXT);
+CREATE TABLE t (
+    v TEXT
+);
