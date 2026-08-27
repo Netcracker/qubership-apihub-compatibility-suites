@@ -1,1 +1,3 @@
-create table t(v numeric(15,2));
+CREATE TABLE t (
+  v NUMERIC(15, 2)
+);

@@ -1,1 +1,3 @@
-create table t(v smallint);
+CREATE TABLE t (
+  v SMALLINT
+);

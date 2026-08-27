@@ -1,1 +1,1 @@
-create table t(v varchar(20));
+CREATE TABLE t (v VARCHAR(20));

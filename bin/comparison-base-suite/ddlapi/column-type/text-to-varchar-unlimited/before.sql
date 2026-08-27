@@ -1,1 +1,1 @@
-create table t(v text);
+CREATE TABLE t (v TEXT);

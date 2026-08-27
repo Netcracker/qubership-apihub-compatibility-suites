@@ -1,1 +1,3 @@
-create table t(v date);
+CREATE TABLE t (
+  v DATE
+);

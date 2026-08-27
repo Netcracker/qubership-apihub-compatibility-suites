@@ -1,1 +1,3 @@
-create table t(v varchar(100));
+CREATE TABLE t (
+  v VARCHAR(100)
+);

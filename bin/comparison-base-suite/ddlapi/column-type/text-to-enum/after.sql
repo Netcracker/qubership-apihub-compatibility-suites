@@ -1,2 +1,5 @@
-create type status as enum ('NEW','DONE');
-create table t(v status);
+CREATE TYPE status AS ENUM ('NEW', 'DONE');
+
+CREATE TABLE t (
+  v status
+);

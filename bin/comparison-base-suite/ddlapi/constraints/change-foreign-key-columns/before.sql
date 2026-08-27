@@ -1,2 +1,1 @@
-create table parent(id int primary key);
-create table child(a int, b int, foreign key(a) references parent(id));
+CREATE TABLE parent(id int primary key); CREATE TABLE child(a int, b int, foreign key(a) references parent(id));

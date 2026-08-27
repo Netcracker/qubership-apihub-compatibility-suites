@@ -1,1 +1,1 @@
-create table t(v double precision);
+CREATE TABLE t (v DOUBLE PRECISION);

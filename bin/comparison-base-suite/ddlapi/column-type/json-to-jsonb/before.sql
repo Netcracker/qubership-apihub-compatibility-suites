@@ -1,1 +1,3 @@
-create table t(v json);
+CREATE TABLE t (
+  v JSON
+);

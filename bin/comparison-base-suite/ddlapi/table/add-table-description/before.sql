@@ -1,1 +1,3 @@
-create table t(id int);
+CREATE TABLE t (
+  id INT
+);

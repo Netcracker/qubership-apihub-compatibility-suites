@@ -1,2 +1,5 @@
-create table t(id int);
-comment on table t is 'x';
+CREATE TABLE t (
+  id INT
+);
+
+COMMENT ON TABLE t IS 'x';

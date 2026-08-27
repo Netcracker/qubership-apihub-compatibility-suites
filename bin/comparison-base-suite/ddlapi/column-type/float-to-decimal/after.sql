@@ -1,1 +1,1 @@
-create table t(v numeric(10,2));
+CREATE TABLE t (v NUMERIC(10, 2));

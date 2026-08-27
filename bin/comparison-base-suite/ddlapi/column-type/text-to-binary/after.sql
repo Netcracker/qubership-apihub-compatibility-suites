@@ -1,1 +1,3 @@
-create table t(v bytea);
+CREATE TABLE t (
+  v BYTEA
+);

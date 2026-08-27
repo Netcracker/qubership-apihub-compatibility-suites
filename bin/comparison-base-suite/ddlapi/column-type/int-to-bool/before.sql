@@ -1,1 +1,3 @@
-create table t(v integer);
+CREATE TABLE t (
+  v INTEGER
+);

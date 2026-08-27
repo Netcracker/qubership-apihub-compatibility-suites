@@ -1,2 +1,5 @@
-create table users(name text);
-comment on column users.name is 'User full name';
+CREATE TABLE users (
+  name TEXT
+);
+
+COMMENT ON COLUMN users.name IS 'User full name';

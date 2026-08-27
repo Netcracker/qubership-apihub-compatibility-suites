@@ -1,1 +1,3 @@
-create table t(v jsonb);
+CREATE TABLE t (
+  v JSONB
+);

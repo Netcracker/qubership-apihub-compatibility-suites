@@ -1,1 +1,3 @@
-create table t(v uuid);
+CREATE TABLE t (
+  v UUID
+);

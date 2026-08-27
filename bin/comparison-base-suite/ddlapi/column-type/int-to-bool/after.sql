@@ -1,1 +1,3 @@
-create table t(v boolean);
+CREATE TABLE t (
+  v BOOLEAN
+);

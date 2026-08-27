@@ -1,3 +1,4 @@
 CREATE TABLE users (
-  name TEXT
+  id INT,
+  phone TEXT
 );

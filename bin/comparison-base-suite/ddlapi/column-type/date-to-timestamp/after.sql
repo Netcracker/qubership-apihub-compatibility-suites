@@ -1,1 +1,3 @@
-create table t(v timestamp);
+CREATE TABLE t (
+  v TIMESTAMP
+);

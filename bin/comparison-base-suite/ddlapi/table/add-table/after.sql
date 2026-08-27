@@ -1,2 +1,7 @@
-create table a(id int);
-create table b(id int);
+CREATE TABLE a (
+  id INT
+);
+
+CREATE TABLE b (
+  id INT
+);
