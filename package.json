@@ -14,7 +14,10 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src",
+    "bin",
+    "index.ts"
   ],
   "scripts": {
     "build": "npm run generate && vite build",
