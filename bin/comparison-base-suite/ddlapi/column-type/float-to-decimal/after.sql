@@ -1,3 +1,0 @@
-CREATE TABLE t (
-    v NUMERIC(10, 2)
-);

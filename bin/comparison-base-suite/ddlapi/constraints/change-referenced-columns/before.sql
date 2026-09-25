@@ -1,9 +1,9 @@
 CREATE TABLE t (
-    id INT,
-    code INT,
-    PRIMARY KEY(id,code)
+    id INT UNIQUE,
+    code INT UNIQUE
 );
 
 CREATE TABLE u (
-    ref INT REFERENCES t(id)
+    ref INT,
+    CONSTRAINT fk_u_t FOREIGN KEY (ref) REFERENCES t (id)
 );

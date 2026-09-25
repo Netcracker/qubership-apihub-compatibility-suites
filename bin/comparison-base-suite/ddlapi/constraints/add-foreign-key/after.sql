@@ -3,5 +3,6 @@ CREATE TABLE t (
 );
 
 CREATE TABLE u (
-    ref INT REFERENCES t(id)
+    ref INT,
+    CONSTRAINT fk_u_t FOREIGN KEY (ref) REFERENCES t (id)
 );

@@ -5,5 +5,5 @@ CREATE TABLE parent (
 CREATE TABLE child (
     a INT,
     b INT,
-    FOREIGN KEY(a) REFERENCES parent(id)
+    CONSTRAINT fk_child_parent FOREIGN KEY (a) REFERENCES parent (id)
 );

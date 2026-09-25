@@ -7,5 +7,6 @@ CREATE TABLE target (
 );
 
 CREATE TABLE u (
-    ref INT REFERENCES legacy(id)
+    ref INT,
+    CONSTRAINT fk_u_ref FOREIGN KEY (ref) REFERENCES legacy (id)
 );
